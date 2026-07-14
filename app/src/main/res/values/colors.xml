@@ -3,10 +3,17 @@
     <color name="solplay_orange">#FF7A00</color>
     <color name="solplay_orange_dark">#E56A00</color>
     <color name="solplay_green">#2E9E4F</color>
+    <color name="solplay_green_dark">#124D26</color>
     <color name="solplay_white">#FFFFFF</color>
     <color name="solplay_black">#1A1A1A</color>
     <color name="solplay_gray">#F2F2F2</color>
     <color name="solplay_text_secondary">#666666</color>
     <color name="whatsapp_green">#25D366</color>
     <color name="whatsapp_green_dark">#128C7E</color>
+
+    <!-- Panneau "Changer de chaîne" en surimpression sur la vidéo : fonds semi-transparents. -->
+    <color name="solplay_panel_overlay">#CC1A1A1A</color>
+    <color name="solplay_panel_header_overlay">#D9E56A00</color>
+    <color name="solplay_search_bg_overlay">#33FFFFFF</color>
+    <color name="solplay_white_60">#99FFFFFF</color>
 </resources>

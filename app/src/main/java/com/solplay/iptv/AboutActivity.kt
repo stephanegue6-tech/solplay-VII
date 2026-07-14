@@ -11,9 +11,12 @@ import com.solplay.iptv.databinding.ActivityAboutBinding
 import kotlinx.coroutines.launch
 
 class AboutActivity : AppCompatActivity() {
+
+    private lateinit var binding: ActivityAboutBinding
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val binding = ActivityAboutBinding.inflate(layoutInflater)
+        binding = ActivityAboutBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         // 1) Affiche d'abord le statut connu localement (rapide, fonctionne hors-ligne).
@@ -28,6 +31,10 @@ class AboutActivity : AppCompatActivity() {
                 updateStatusText(binding, active)
             }
         }
+
+        // Se met à jour chaque minute tant que l'écran est affiché, pour rester
+        // cohérent avec les autres écrans (essai/licence) au lieu de rester figé.
+        LiveCountdown.attach(this) { updateStatusText(binding, TrialManager.isLicensed(this)) }
 
         val deviceKey = DeviceKeyManager.getDeviceKey(this)
         binding.tvDeviceKeyAbout.text = deviceKey

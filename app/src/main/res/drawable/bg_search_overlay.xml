@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fond de la barre de recherche flottant sur la vidéo : légèrement translucide, coins arrondis. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/solplay_search_bg_overlay" />
+    <corners android:radius="8dp" />
+    <stroke android:width="1dp" android:color="@color/solplay_white_60" />
+</shape>

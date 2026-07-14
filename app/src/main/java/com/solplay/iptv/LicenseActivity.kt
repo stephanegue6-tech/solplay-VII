@@ -28,6 +28,10 @@ class LicenseActivity : AppCompatActivity() {
 
         refreshUiState()
 
+        // Se met à jour chaque minute tant que l'écran est affiché, au lieu de
+        // rester figé sur la valeur calculée à l'ouverture de l'écran.
+        LiveCountdown.attach(this) { refreshUiState() }
+
         binding.btnContinueTrial.setOnClickListener {
             goToApp()
         }

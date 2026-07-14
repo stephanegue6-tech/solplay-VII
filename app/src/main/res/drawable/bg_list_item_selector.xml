@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Fond des lignes de liste (chaînes, playlists...).
+    Vert foncé bien visible quand la ligne est sélectionnée/survolée
+    (au doigt, à la souris ou avec la télécommande d'une box/TV),
+    transparent sinon.
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true" android:drawable="@color/solplay_green_dark" />
+    <item android:state_pressed="true" android:drawable="@color/solplay_green_dark" />
+    <item android:state_selected="true" android:drawable="@color/solplay_green_dark" />
+    <item android:drawable="@android:color/transparent" />
+</selector>

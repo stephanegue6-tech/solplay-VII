@@ -16,10 +16,34 @@ android {
         versionName "1.0"
     }
 
+    // Clés de signature FIXES (committées dans /keystore), pour que chaque
+    // build (local ou via GitHub Actions) produise la MÊME signature.
+    // Sans ça, chaque nouveau build debug utilise une clé aléatoire générée
+    // sur la machine, et Android refuse alors la mise à jour "par-dessus"
+    // l'app existante (il oblige à désinstaller avant de réinstaller).
+    signingConfigs {
+        debug {
+            storeFile file("../keystore/debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+        release {
+            storeFile file("../keystore/release.keystore")
+            storePassword "solplay2026"
+            keyAlias "solplayrelease"
+            keyPassword "solplay2026"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
 

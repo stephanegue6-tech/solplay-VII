@@ -38,10 +38,9 @@ class PlaylistActivity : AppCompatActivity() {
         if (TrialManager.isLicensed(this)) {
             binding.tvTrialBanner.visibility = android.view.View.GONE
         } else {
-            binding.tvTrialBanner.text = getString(
-                R.string.trial_active_format,
-                TrialManager.formatDuration(TrialManager.getRemainingTrialMillis(this))
-            )
+            // Se met à jour chaque minute tant que l'écran est affiché, au lieu
+            // de rester figé sur la valeur calculée à l'ouverture de l'écran.
+            LiveCountdown.attach(this) { updateTrialBanner() }
         }
 
         // Mode édition : si on vient de "Mes playlists" avec une playlist à modifier,
@@ -78,6 +77,20 @@ class PlaylistActivity : AppCompatActivity() {
         binding.btnAbout.setOnClickListener {
             startActivity(Intent(this, AboutActivity::class.java))
         }
+    }
+
+    private fun updateTrialBanner() {
+        val remaining = TrialManager.getRemainingTrialMillis(this)
+        if (remaining <= 0) {
+            // Essai terminé : on renvoie vers l'écran d'activation/licence.
+            startActivity(Intent(this, LicenseActivity::class.java))
+            finish()
+            return
+        }
+        binding.tvTrialBanner.text = getString(
+            R.string.trial_active_format,
+            TrialManager.formatDuration(remaining)
+        )
     }
 
     /** Pré-remplit le formulaire à partir d'une playlist existante (mode édition). */

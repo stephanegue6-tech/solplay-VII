@@ -3,6 +3,8 @@ package com.solplay.iptv
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.MediaItem
@@ -23,9 +25,16 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var binding: ActivityPlayerBinding
     private var player: ExoPlayer? = null
     private lateinit var sideAdapter: ChannelAdapter
+    private var sideChannels: List<Channel> = emptyList()
 
     private val hideHandler = Handler(Looper.getMainLooper())
-    private val hideTitleRunnable = Runnable { binding.tvChannelTitle.visibility = View.GONE }
+
+    // Le bandeau du titre ET le bouton "Chaînes" apparaissent/disparaissent toujours ensemble :
+    // visibles 5 secondes puis masqués automatiquement, et réaffichés sur simple tap écran.
+    private val hideControlsRunnable = Runnable {
+        binding.tvChannelTitle.visibility = View.GONE
+        if (sideChannels.size > 1) binding.btnChannelList.visibility = View.GONE
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,30 +52,59 @@ class PlayerActivity : AppCompatActivity() {
         playStream(startUrl, startName)
 
         // Un tap sur l'écran (en dehors des contrôles ExoPlayer) refait apparaître
-        // le bandeau du nom de la chaîne pour 5 secondes.
-        binding.playerView.setOnClickListener { showTitleTemporarily() }
+        // le titre et le bouton "Chaînes" ensemble, pour 5 secondes.
+        binding.playerView.setOnClickListener { showControlsTemporarily() }
 
         binding.btnChannelList.setOnClickListener { toggleSidePanel() }
+        setupSideSearch()
     }
 
     /** Construit le panneau latéral avec la liste de chaînes transmise par ChannelsActivity. */
     private fun setupSidePanel() {
-        val list = ChannelRepository.playingList
-        sideAdapter = ChannelAdapter(list) { channel ->
+        sideChannels = ChannelRepository.playingList
+        // Layout "dark" : texte blanc, lisible sur le fond transparent qui laisse voir la vidéo.
+        sideAdapter = ChannelAdapter(sideChannels, itemLayoutRes = R.layout.item_channel_dark) { channel ->
             playStream(channel.streamUrl, channel.name)
             binding.channelListPanel.visibility = View.GONE
+            binding.etSideSearch.text?.clear()
         }
         binding.recyclerSideChannels.layoutManager = LinearLayoutManager(this)
         binding.recyclerSideChannels.adapter = sideAdapter
 
         // On ne montre le bouton "Chaînes" que s'il y a effectivement d'autres chaînes
         // à proposer (évite un bouton inutile si on arrive d'ailleurs sans contexte).
-        binding.btnChannelList.visibility = if (list.size > 1) View.VISIBLE else View.GONE
+        binding.btnChannelList.visibility = if (sideChannels.size > 1) View.VISIBLE else View.GONE
+    }
+
+    /** Filtre la liste du panneau latéral par nom de chaîne, en direct pendant la saisie. */
+    private fun setupSideSearch() {
+        binding.etSideSearch.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                val query = s?.toString()?.trim() ?: ""
+                val filtered = if (query.isEmpty()) {
+                    sideChannels
+                } else {
+                    sideChannels.filter { it.name.contains(query, ignoreCase = true) }
+                }
+                sideAdapter.updateData(filtered)
+            }
+
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
     }
 
     private fun toggleSidePanel() {
-        binding.channelListPanel.visibility =
-            if (binding.channelListPanel.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        val opening = binding.channelListPanel.visibility != View.VISIBLE
+        binding.channelListPanel.visibility = if (opening) View.VISIBLE else View.GONE
+        if (opening) {
+            // Le panneau étant ouvert, on garde titre + bouton visibles et on suspend
+            // la disparition automatique pendant que l'utilisateur cherche/parcourt.
+            showControlsTemporarily(keepVisible = true)
+        } else {
+            binding.etSideSearch.text?.clear()
+            showControlsTemporarily()
+        }
     }
 
     /** Change (ou démarre) le flux en cours de lecture, sans recréer l'Activity. */
@@ -77,18 +115,26 @@ class PlayerActivity : AppCompatActivity() {
             prepare()
             playWhenReady = true
         }
-        showTitleTemporarily()
+        showControlsTemporarily()
     }
 
-    private fun showTitleTemporarily() {
+    /**
+     * Affiche ensemble le bandeau du titre et le bouton "Chaînes".
+     * Si [keepVisible] est vrai (panneau latéral ouvert), on ne programme pas leur disparition
+     * automatique tant que l'utilisateur interagit avec la liste/recherche.
+     */
+    private fun showControlsTemporarily(keepVisible: Boolean = false) {
         binding.tvChannelTitle.visibility = View.VISIBLE
-        hideHandler.removeCallbacks(hideTitleRunnable)
-        hideHandler.postDelayed(hideTitleRunnable, TITLE_DISPLAY_MS)
+        if (sideChannels.size > 1) binding.btnChannelList.visibility = View.VISIBLE
+        hideHandler.removeCallbacks(hideControlsRunnable)
+        if (!keepVisible) {
+            hideHandler.postDelayed(hideControlsRunnable, TITLE_DISPLAY_MS)
+        }
     }
 
     override fun onStop() {
         super.onStop()
-        hideHandler.removeCallbacks(hideTitleRunnable)
+        hideHandler.removeCallbacks(hideControlsRunnable)
         player?.release()
         player = null
     }

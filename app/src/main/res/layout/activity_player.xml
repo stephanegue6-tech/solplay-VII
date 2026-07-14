@@ -37,24 +37,39 @@
         android:textStyle="bold"
         android:visibility="gone" />
 
-    <!-- Panneau latéral : liste des chaînes de la même catégorie, changement au clic. -->
+    <!-- Panneau latéral : liste des chaînes de la même catégorie, changement au clic.
+         Reste transparent (fond semi-translucide) puisqu'il se superpose à la vidéo en cours,
+         et disparaît/réapparaît avec les autres contrôles (titre + bouton "Chaînes"). -->
     <LinearLayout
         android:id="@+id/channelListPanel"
         android:layout_width="280dp"
         android:layout_height="match_parent"
         android:layout_gravity="end"
-        android:background="@color/solplay_white"
+        android:background="@color/solplay_panel_overlay"
         android:orientation="vertical"
         android:visibility="gone">
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/solplay_orange_dark"
+            android:background="@color/solplay_panel_header_overlay"
             android:padding="12dp"
             android:text="Changer de chaîne"
             android:textColor="@color/solplay_white"
             android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/etSideSearch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="10dp"
+            android:background="@drawable/bg_search_overlay"
+            android:hint="Rechercher une chaîne..."
+            android:textColorHint="@color/solplay_white_60"
+            android:textColor="@color/solplay_white"
+            android:inputType="text"
+            android:maxLines="1"
+            android:padding="10dp" />
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recyclerSideChannels"

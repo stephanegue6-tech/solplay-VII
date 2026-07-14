@@ -9,7 +9,8 @@ import androidx.recyclerview.widget.RecyclerView
 
 class ChannelAdapter(
     private var channels: List<Channel>,
-    private val onClick: (Channel) -> Unit
+    private val onClick: (Channel) -> Unit,
+    private val itemLayoutRes: Int = R.layout.item_channel
 ) : RecyclerView.Adapter<ChannelAdapter.ChannelViewHolder>() {
 
     class ChannelViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -29,7 +30,7 @@ class ChannelAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChannelViewHolder {
         val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_channel, parent, false)
+            .inflate(itemLayoutRes, parent, false)
         return ChannelViewHolder(view)
     }
 
