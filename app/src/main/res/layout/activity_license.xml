@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/solplay_white">
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="16dp"
+        android:text="@string/app_name"
+        android:textColor="@color/solplay_orange"
+        android:textSize="32sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:gravity="center"
+        android:textColor="@color/solplay_black"
+        android:textSize="18sp" />
+
+    <Button
+        android:id="@+id/btnContinueTrial"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:backgroundTint="@color/solplay_green"
+        android:text="@string/btn_continue_trial"
+        android:textColor="@color/solplay_white" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="32dp"
+        android:background="@color/solplay_gray" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="Votre clé appareil (à envoyer à SolPlay pour activation) :"
+        android:textColor="@color/solplay_text_secondary" />
+
+    <TextView
+        android:id="@+id/tvDeviceKey"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@color/solplay_gray"
+        android:padding="12dp"
+        android:textColor="@color/solplay_black"
+        android:textStyle="bold"
+        android:textIsSelectable="true" />
+
+    <Button
+        android:id="@+id/btnCopyDeviceKey"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:text="Copier la clé appareil" />
+
+    <Button
+        android:id="@+id/btnContactUs"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:backgroundTint="@color/solplay_orange"
+        android:text="@string/btn_contact_us"
+        android:textColor="@color/solplay_white" />
+
+    <Button
+        android:id="@+id/btnVerifyActivation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:backgroundTint="@color/solplay_green"
+        android:text="Vérifier mon activation"
+        android:textColor="@color/solplay_white" />
+
+    <ProgressBar
+        android:id="@+id/progressBarLicense"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="12dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:gravity="center"
+        android:textColor="@color/solplay_text_secondary"
+        android:textSize="12sp"
+        android:text="@string/contact_email" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textColor="@color/solplay_text_secondary"
+        android:textSize="12sp"
+        android:text="@string/contact_phone" />
+
+</LinearLayout>
+</ScrollView>

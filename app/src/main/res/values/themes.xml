@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.SolPlay" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">@color/solplay_orange</item>
+        <item name="colorPrimaryVariant">@color/solplay_orange_dark</item>
+        <item name="colorOnPrimary">@color/solplay_white</item>
+        <item name="colorSecondary">@color/solplay_green</item>
+        <item name="colorOnSecondary">@color/solplay_white</item>
+        <item name="android:windowBackground">@color/solplay_white</item>
+        <item name="android:statusBarColor">@color/solplay_orange_dark</item>
+        <item name="android:textColorPrimary">@color/solplay_black</item>
+        <item name="android:editTextColor">@color/solplay_black</item>
+    </style>
+
+    <style name="Theme.SolPlay.Splash" parent="Theme.SolPlay">
+        <item name="android:windowBackground">@color/solplay_orange</item>
+    </style>
+</resources>

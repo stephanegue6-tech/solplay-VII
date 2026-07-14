@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/solplay_white">
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/solplay_orange"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/app_name"
+            android:textColor="@color/solplay_white"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/btnAbout"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="@android:color/transparent"
+            android:src="@android:drawable/ic_menu_info_details"
+            app:tint="@color/solplay_white" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvTrialBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/solplay_green"
+        android:gravity="center"
+        android:padding="6dp"
+        android:textColor="@color/solplay_white"
+        android:textSize="13sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/hint_playlist_name"
+            android:textColor="@color/solplay_text_secondary" />
+
+        <EditText
+            android:id="@+id/etPlaylistName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/hint_playlist_name"
+            android:textColor="@color/solplay_black"
+            android:textColorHint="@color/solplay_text_secondary" />
+
+        <RadioGroup
+            android:id="@+id/rgMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/rbM3u"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checked="true"
+                android:text="@string/mode_m3u"
+                android:textColor="@color/solplay_black" />
+
+            <RadioButton
+                android:id="@+id/rbXtream"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/mode_xtream"
+                android:textColor="@color/solplay_black" />
+        </RadioGroup>
+
+        <!-- Bloc Lien M3U -->
+        <LinearLayout
+            android:id="@+id/llM3u"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="visible">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/hint_playlist_url"
+                android:textColor="@color/solplay_text_secondary" />
+
+            <EditText
+                android:id="@+id/etPlaylistUrl"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="http://exemple.com/playlist.m3u"
+                android:inputType="textUri"
+                android:textColor="@color/solplay_black"
+                android:textColorHint="@color/solplay_text_secondary" />
+        </LinearLayout>
+
+        <!-- Bloc Xtream Codes -->
+        <LinearLayout
+            android:id="@+id/llXtream"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/hint_xtream_server"
+                android:textColor="@color/solplay_text_secondary" />
+
+            <EditText
+                android:id="@+id/etXtreamServer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/hint_xtream_server"
+                android:inputType="textUri"
+                android:textColor="@color/solplay_black"
+                android:textColorHint="@color/solplay_text_secondary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/hint_xtream_username"
+                android:textColor="@color/solplay_text_secondary" />
+
+            <EditText
+                android:id="@+id/etXtreamUsername"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/hint_xtream_username"
+                android:textColor="@color/solplay_black"
+                android:textColorHint="@color/solplay_text_secondary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/hint_xtream_password"
+                android:textColor="@color/solplay_text_secondary" />
+
+            <EditText
+                android:id="@+id/etXtreamPassword"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/hint_xtream_password"
+                android:inputType="textPassword"
+                android:textColor="@color/solplay_black"
+                android:textColorHint="@color/solplay_text_secondary" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnLoadPlaylist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:backgroundTint="@color/solplay_orange"
+            android:text="@string/btn_load_playlist"
+            android:textColor="@color/solplay_white" /> 
+      
+        <Button
+            android:id="@+id/btnMyPlaylists"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:text="Mes playlists" />
+
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="16dp"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+</LinearLayout>
+</ScrollView>

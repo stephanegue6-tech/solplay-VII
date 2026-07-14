@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "359488467526",
+    "firebase_url": "https://solplay-2ec6c-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "solplay-2ec6c",
+    "storage_bucket": "solplay-2ec6c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:359488467526:android:fe49d77b69d51d0303d047",
+        "android_client_info": {
+          "package_name": "com.solplay.iptv"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAioC2LGkXsAJhYa5o2zW5pyg01Vo6p4r8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

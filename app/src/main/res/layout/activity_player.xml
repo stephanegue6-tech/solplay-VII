@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black">
+
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/playerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:use_controller="true" />
+
+    <!-- Nom de la chaîne : ne s'affiche que 5 secondes, réapparaît sur simple tap écran. -->
+    <TextView
+        android:id="@+id/tvChannelTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_margin="12dp"
+        android:background="@color/solplay_orange"
+        android:padding="6dp"
+        android:textColor="@color/solplay_white"
+        android:textStyle="bold" />
+
+    <!-- Bouton pour ouvrir la liste des chaînes sans quitter le lecteur. -->
+    <TextView
+        android:id="@+id/btnChannelList"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_margin="12dp"
+        android:background="@color/solplay_orange"
+        android:padding="8dp"
+        android:text="☰ Chaînes"
+        android:textColor="@color/solplay_white"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- Panneau latéral : liste des chaînes de la même catégorie, changement au clic. -->
+    <LinearLayout
+        android:id="@+id/channelListPanel"
+        android:layout_width="280dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="end"
+        android:background="@color/solplay_white"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/solplay_orange_dark"
+            android:padding="12dp"
+            android:text="Changer de chaîne"
+            android:textColor="@color/solplay_white"
+            android:textStyle="bold" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerSideChannels"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+    </LinearLayout>
+
+</FrameLayout>

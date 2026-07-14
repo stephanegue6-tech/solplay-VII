@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SolPlay</string>
+    <string name="tagline">Votre lecteur IPTV nouvelle génération</string>
+
+    <string name="contact_email">stephanegue2018@gmail.com</string>
+    <string name="contact_phone">+225 05 03 06 69 12</string>
+
+    <string name="trial_days">30</string>
+    <string name="trial_active_format">Essai gratuit : %1$d jour(s) restant(s)</string>
+    <string name="trial_expired_title">Votre essai gratuit est terminé</string>
+    <string name="trial_expired_message">Passez à SolPlay Pro pour continuer à profiter de vos chaînes sans interruption.</string>
+
+    <string name="btn_activate_pro">Activer la version Pro</string>
+    <string name="btn_continue_trial">Continuer l\'essai gratuit</string>
+    <string name="btn_contact_us">Nous contacter pour acheter</string>
+
+    <string name="hint_playlist_url">Lien de la playlist M3U</string>
+    <string name="hint_playlist_name">Nom de la playlist (ex: Ma Playlist)</string>
+    <string name="btn_load_playlist">Charger la playlist</string>
+
+    <string name="mode_m3u">Lien M3U</string>
+    <string name="mode_xtream">Xtream Codes</string>
+    <string name="hint_xtream_server">Serveur (ex: http://exemple.com:8080)</string>
+    <string name="hint_xtream_username">Nom d\'utilisateur</string>
+    <string name="hint_xtream_password">Mot de passe</string>
+
+    <string name="hint_license_code">Entrez votre code d\'activation Pro</string>
+    <string name="btn_activate">Activer</string>
+    <string name="license_invalid">Code invalide. Contactez-nous pour obtenir votre code.</string>
+    <string name="license_success">Version Pro activée. Merci de votre confiance !</string>
+
+    <string name="about_title">À propos de SolPlay</string>
+
+    <string name="device_key_format">%1$s</string>
+
+    <string name="legal_disclaimer_text">SolPlay est une application de lecture multimédia (lecteur de flux IPTV), au même titre qu\'un lecteur vidéo classique. SolPlay ne vend, n\'héberge et ne fournit aucune chaîne de télévision, aucun contenu audiovisuel ni aucun flux vidéo.\n\nL\'application permet uniquement de lire les playlists ou les accès que vous configurez vous-même, à partir de votre propre fournisseur.\n\nIl est de votre entière responsabilité de vérifier que votre fournisseur dispose des autorisations de diffusion nécessaires. Nous vous recommandons de privilégier exclusivement des fournisseurs IPTV agréés et légalement autorisés à diffuser du contenu.\n\nSolPlay décline toute responsabilité quant à l\'usage fait de l\'application par ses utilisateurs.</string>
+
+</resources>

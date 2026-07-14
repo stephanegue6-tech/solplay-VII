@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="solplay_orange">#FF7A00</color>
+    <color name="solplay_orange_dark">#E56A00</color>
+    <color name="solplay_green">#2E9E4F</color>
+    <color name="solplay_white">#FFFFFF</color>
+    <color name="solplay_black">#1A1A1A</color>
+    <color name="solplay_gray">#F2F2F2</color>
+    <color name="solplay_text_secondary">#666666</color>
+</resources>
