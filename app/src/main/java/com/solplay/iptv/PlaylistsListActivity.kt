@@ -33,6 +33,9 @@ class PlaylistsListActivity : AppCompatActivity() {
         binding.btnRedeemCode.setOnClickListener {
             startActivity(Intent(this, RedeemCodeActivity::class.java))
         }
+        binding.btnRefreshAccounts.setOnClickListener {
+            refreshAccounts()
+        }
     }
 
    override fun onResume() {
@@ -46,6 +49,36 @@ class PlaylistsListActivity : AppCompatActivity() {
     }
 }
 
+
+    /**
+     * Force une resynchronisation immédiate avec les codes/comptes assignés par
+     * l'admin (Firebase "device_playlists"), sans avoir à ouvrir "Modifier".
+     * Utile juste après que l'admin a assigné ou changé un code M3U/Xtream.
+     */
+    private fun refreshAccounts() {
+        binding.btnRefreshAccounts.isEnabled = false
+        binding.btnRefreshAccounts.text = "Actualisation…"
+        lifecycleScope.launch {
+            try {
+                DevicePlaylistSync.sync(this@PlaylistsListActivity)
+                refresh()
+                Toast.makeText(
+                    this@PlaylistsListActivity,
+                    "Comptes actualisés.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this@PlaylistsListActivity,
+                    "Impossible d'actualiser : ${e.message ?: "erreur inconnue"}.",
+                    Toast.LENGTH_LONG
+                ).show()
+            } finally {
+                binding.btnRefreshAccounts.isEnabled = true
+                binding.btnRefreshAccounts.text = "🔄 Actualiser les comptes"
+            }
+        }
+    }
 
     private fun refresh() {
         val playlists = PlaylistStore.getAll(this)

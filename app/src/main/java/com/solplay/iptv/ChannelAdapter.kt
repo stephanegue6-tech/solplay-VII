@@ -9,8 +9,8 @@ import androidx.recyclerview.widget.RecyclerView
 
 class ChannelAdapter(
     private var channels: List<Channel>,
-    private val onClick: (Channel) -> Unit,
-    private val itemLayoutRes: Int = R.layout.item_channel
+    private val itemLayoutRes: Int = R.layout.item_channel,
+    private val onClick: (Channel) -> Unit
 ) : RecyclerView.Adapter<ChannelAdapter.ChannelViewHolder>() {
 
     class ChannelViewHolder(view: View) : RecyclerView.ViewHolder(view) {
