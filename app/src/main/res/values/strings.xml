@@ -6,10 +6,21 @@
     <string name="contact_email">stephanegue2018@gmail.com</string>
     <string name="contact_phone">+225 05 03 06 69 12</string>
 
-    <string name="trial_days">30</string>
-    <string name="trial_active_format">Essai gratuit : %1$d jour(s) restant(s)</string>
-    <string name="trial_expired_title">Votre essai gratuit est terminé</string>
-    <string name="trial_expired_message">Passez à SolPlay Pro pour continuer à profiter de vos chaînes sans interruption.</string>
+    <!-- Numéro utilisé uniquement pour construire le lien WhatsApp (wa.me),
+         jamais affiché tel quel à l'écran. Format international, sans le +. -->
+    <string name="whatsapp_phone_international">2250503067912</string>
+
+    <string name="trial_hours">24</string>
+    <string name="trial_active_format">Essai gratuit : %1$s restant(s)</string>
+    <string name="trial_expired_title">Votre essai gratuit de 24h est terminé</string>
+
+    <string name="license_active_format">Version Pro active — expire le %1$s\n(%2$s restant)</string>
+    <string name="license_active_unlimited">Version Pro active (sans expiration)</string>
+
+    <string name="access_blocked_title">⏰ Accès bloqué</string>
+    <string name="access_blocked_message">Votre essai gratuit de 24 heures est terminé.\n\nPour continuer à profiter de SolPlay sans interruption, merci de contacter votre revendeur afin de souscrire à un abonnement (1, 3, 6 ou 12 mois).\n\nUne fois votre abonnement activé par le revendeur, revenez sur cet écran et appuyez sur \"Vérifier mon activation\".</string>
+
+    <string name="btn_whatsapp_contact">Contacter le revendeur</string>
 
     <string name="btn_activate_pro">Activer la version Pro</string>
     <string name="btn_continue_trial">Continuer l\'essai gratuit</string>

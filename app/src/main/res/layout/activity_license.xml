@@ -29,6 +29,70 @@
         android:textColor="@color/solplay_black"
         android:textSize="18sp" />
 
+    <!-- ===================== ETAT BLOQUE (essai + licence expires) ===================== -->
+    <!-- Bloque l'acces a l'application : message + bouton WhatsApp juste en dessous. -->
+    <LinearLayout
+        android:id="@+id/groupBlocked"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:background="@color/solplay_gray"
+        android:padding="16dp"
+        android:layout_marginTop="16dp">
+
+        <TextView
+            android:id="@+id/tvBlockedTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/access_blocked_title"
+            android:textColor="@color/solplay_orange_dark"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:gravity="center" />
+
+        <TextView
+            android:id="@+id/tvBlockedMessage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/access_blocked_message"
+            android:textColor="@color/solplay_black"
+            android:textSize="15sp"
+            android:lineSpacingExtra="3dp" />
+
+        <!-- Bouton cliquable WhatsApp, juste en bas du message bloquant -->
+        <LinearLayout
+            android:id="@+id/btnWhatsApp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_whatsapp_button"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="14dp">
+
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:src="@drawable/ic_whatsapp"
+                android:contentDescription="@string/btn_whatsapp_contact" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="12dp"
+                android:text="@string/btn_whatsapp_contact"
+                android:textColor="@color/solplay_white"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:gravity="center" />
+        </LinearLayout>
+    </LinearLayout>
+
     <Button
         android:id="@+id/btnContinueTrial"
         android:layout_width="match_parent"
@@ -48,7 +112,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="24dp"
-        android:text="Votre clé appareil (à envoyer à SolPlay pour activation) :"
+        android:text="Votre cle appareil (a envoyer a SolPlay pour activation) :"
         android:textColor="@color/solplay_text_secondary" />
 
     <TextView
@@ -68,7 +132,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:text="Copier la clé appareil" />
+        android:text="Copier la cle appareil" />
 
     <Button
         android:id="@+id/btnContactUs"
@@ -85,7 +149,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
         android:backgroundTint="@color/solplay_green"
-        android:text="Vérifier mon activation"
+        android:text="Verifier mon activation"
         android:textColor="@color/solplay_white" />
 
     <ProgressBar

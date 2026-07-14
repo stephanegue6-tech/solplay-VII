@@ -40,10 +40,23 @@ class AboutActivity : AppCompatActivity() {
     }
 
     private fun updateStatusText(binding: ActivityAboutBinding, licensed: Boolean) {
-        binding.tvLicenseStatus.text = if (licensed) {
-            "Statut : Version Pro activée ✅"
+        if (licensed) {
+            binding.tvLicenseStatus.text = "Statut : Version Pro activée ✅"
+            val expiresAt = TrialManager.getLicenseExpiresAt(this)
+            binding.tvLicenseExpiry.text = if (expiresAt == 0L) {
+                "Abonnement sans date d'expiration"
+            } else {
+                val remaining = TrialManager.getRemainingLicenseMillis(this)
+                "Expire le ${TrialManager.formatDate(expiresAt)} (${TrialManager.formatDuration(remaining)} restant)"
+            }
         } else {
-            "Statut : Essai gratuit (${TrialManager.getRemainingTrialDays(this)} jour(s) restant(s))"
+            val remaining = TrialManager.getRemainingTrialMillis(this)
+            binding.tvLicenseStatus.text = if (remaining > 0) {
+                "Statut : Essai gratuit (${TrialManager.formatDuration(remaining)} restant)"
+            } else {
+                "Statut : Essai gratuit terminé — abonnement requis"
+            }
+            binding.tvLicenseExpiry.text = ""
         }
     }
 }

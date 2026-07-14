@@ -6,7 +6,12 @@ Application Android (Kotlin) type "Smarters Pro / IBO Player" pour la marque **S
 - Chargement de playlists M3U/M3U8 par URL
 - Lecture des flux (ExoPlayer / Media3, compatible HLS, TS)
 - Liste des chaînes avec logos et catégories
-- Essai gratuit de **30 jours** géré automatiquement à la première ouverture
+- Essai gratuit de **24 heures** géré automatiquement à la première ouverture,
+  puis blocage avec message + bouton WhatsApp pour contacter le revendeur
+- Abonnements activables depuis le panneau admin : tests de 1h à 24h, ou
+  abonnements normaux de 1, 3, 6 ou 12 mois, avec date d'expiration affichée
+  dans l'app à côté du statut de licence
+- Rappel automatique (notification) chaque heure du temps restant
 - Écran d'activation de la version **Pro** par code d'activation
 - Charte graphique orange / blanc / vert
 - Coordonnées de contact intégrées (email + téléphone)

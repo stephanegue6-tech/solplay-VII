@@ -30,9 +30,19 @@ Google personnel.
   "rules": {
     "licenses": {
       "$deviceKey": {
-        "active": {
-          ".read": true
-        },
+        ".read": true,
+        ".write": "auth != null"
+      }
+    },
+    "device_playlists": {
+      "$deviceKey": {
+        ".read": true,
+        ".write": "auth != null"
+      }
+    },
+    "playlist_codes": {
+      "$code": {
+        ".read": true,
         ".write": "auth != null"
       }
     }
@@ -40,9 +50,19 @@ Google personnel.
 }
 ```
 
-Ça veut dire : n'importe qui peut vérifier si SA propre clé est activée
-(lecture), mais seul un administrateur connecté peut modifier une licence
-(écriture).
+Ça veut dire : n'importe qui peut vérifier SA propre licence, playlist assignée
+ou code (lecture publique par clé/appareil), mais seul un administrateur
+connecté peut créer/modifier/supprimer quoi que ce soit (écriture).
+
+⚠️ **Important — cause la plus fréquente du panneau admin qui "ne sauvegarde
+plus rien"** : les anciennes règles ne couvraient que le nœud `licenses`. Sans
+règle explicite pour `device_playlists` et `playlist_codes`, Firebase refuse
+silencieusement toute écriture sur ces deux nœuds dès que la base sort du
+"mode test" (qui expire automatiquement au bout de 30 jours). Si le panneau
+admin ne sauvegarde toujours rien après avoir mis à jour ces règles, ouvre la
+console du navigateur (F12) pendant l'enregistrement : le panneau admin
+affiche maintenant le code d'erreur exact (ex: `PERMISSION_DENIED`) directement
+à l'écran.
 
 ## 3. Créer ton compte administrateur
 

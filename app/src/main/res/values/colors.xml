@@ -7,4 +7,6 @@
     <color name="solplay_black">#1A1A1A</color>
     <color name="solplay_gray">#F2F2F2</color>
     <color name="solplay_text_secondary">#666666</color>
+    <color name="whatsapp_green">#25D366</color>
+    <color name="whatsapp_green_dark">#128C7E</color>
 </resources>
