@@ -14,6 +14,10 @@ android {
         targetSdk 34
         versionCode 1
         versionName "1.0"
+
+        // Injecte la clé TMDB (définie dans gradle.properties) comme constante
+        // de compilation, accessible via BuildConfig.TMDB_API_KEY dans le code Kotlin.
+        buildConfigField "String", "TMDB_API_KEY", "\"${project.findProperty('TMDB_API_KEY') ?: ''}\""
     }
 
     // Clés de signature FIXES (committées dans /keystore), pour que chaque

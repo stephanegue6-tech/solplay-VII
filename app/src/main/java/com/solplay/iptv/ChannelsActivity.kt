@@ -5,8 +5,6 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.tabs.TabLayout
@@ -17,15 +15,16 @@ class ChannelsActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_CHANNELS = "extra_channels"
         const val EXTRA_INITIAL_TYPE = "extra_initial_type"
-        private const val ALL_CATEGORIES = "Toutes les catégories"
+        private const val ALL_BOUQUETS = "Tous"
     }
 
     private lateinit var binding: ActivityChannelsBinding
-    private lateinit var adapter: ChannelAdapter
+    private lateinit var channelAdapter: ChannelAdapter
+    private lateinit var bouquetAdapter: BouquetAdapter
 
     private var allChannels: List<Channel> = emptyList()
     private var currentType: ContentType = ContentType.LIVE
-    private var currentCategory: String = ALL_CATEGORIES
+    private var currentBouquet: String = ALL_BOUQUETS
     private var currentQuery: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,34 +34,39 @@ class ChannelsActivity : AppCompatActivity() {
 
         allChannels = ChannelRepository.channels
 
-        adapter = ChannelAdapter(emptyList()) { channel ->
-            // On mémorise la liste actuellement filtrée (onglet + catégorie + recherche)
-            // pour que le lecteur puisse proposer les autres chaînes sans qu'on ait à sortir.
-            ChannelRepository.setPlayingList(adapter.currentList())
-            val intent = Intent(this, PlayerActivity::class.java)
-            intent.putExtra(PlayerActivity.EXTRA_STREAM_URL, channel.streamUrl)
-            intent.putExtra(PlayerActivity.EXTRA_STREAM_NAME, channel.name)
-            startActivity(intent)
-        }
+        channelAdapter = ChannelAdapter(emptyList()) { channel -> openPlayer(channel) }
         binding.recyclerChannels.layoutManager = LinearLayoutManager(this)
-        binding.recyclerChannels.adapter = adapter
+        binding.recyclerChannels.adapter = channelAdapter
+
+        bouquetAdapter = BouquetAdapter(emptyList()) { bouquet ->
+            currentBouquet = bouquet.name
+            bouquetAdapter.setSelected(bouquet.name)
+            applyFilters()
+        }
+        binding.recyclerBouquets.layoutManager = LinearLayoutManager(this)
+        binding.recyclerBouquets.adapter = bouquetAdapter
 
         setupTabs()
-        setupCategorySpinner()
         setupSearch()
 
-        // Si on arrive depuis l'écran d'accueil avec un choix précis (Live TV / Films
-        // / Séries), on présélectionne directement l'onglet correspondant.
         when (intent.getStringExtra(EXTRA_INITIAL_TYPE)) {
             ContentType.MOVIE.name -> binding.tabLayout.getTabAt(1)?.select()
             ContentType.SERIES.name -> binding.tabLayout.getTabAt(2)?.select()
             else -> binding.tabLayout.getTabAt(0)?.select()
         }
 
+        refreshBouquets()
         applyFilters()
     }
 
-    /** Les 3 onglets Live / Films / Séries. */
+    private fun openPlayer(channel: Channel) {
+        ChannelRepository.setPlayingList(channelsForCurrentType())
+        val intent = Intent(this, PlayerActivity::class.java)
+        intent.putExtra(PlayerActivity.EXTRA_STREAM_URL, channel.streamUrl)
+        intent.putExtra(PlayerActivity.EXTRA_STREAM_NAME, channel.name)
+        startActivity(intent)
+    }
+
     private fun setupTabs() {
         binding.tabLayout.addTab(binding.tabLayout.newTab().setText("Live"))
         binding.tabLayout.addTab(binding.tabLayout.newTab().setText("Films"))
@@ -75,8 +79,8 @@ class ChannelsActivity : AppCompatActivity() {
                     2 -> ContentType.SERIES
                     else -> ContentType.LIVE
                 }
-                currentCategory = ALL_CATEGORIES
-                updateCategorySpinner()
+                currentBouquet = ALL_BOUQUETS
+                refreshBouquets()
                 applyFilters()
             }
 
@@ -88,34 +92,20 @@ class ChannelsActivity : AppCompatActivity() {
     private fun channelsForCurrentType(): List<Channel> =
         allChannels.filter { it.contentType() == currentType }
 
-    /** Liste déroulante des catégories (group-title), propre à l'onglet sélectionné. */
-    private fun setupCategorySpinner() {
-        updateCategorySpinner()
-        binding.spinnerCategory.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                @Suppress("UNCHECKED_CAST")
-                val items = parent?.adapter as? ArrayAdapter<String> ?: return
-                currentCategory = items.getItem(position) ?: ALL_CATEGORIES
-                applyFilters()
-            }
+    private fun refreshBouquets() {
+        val channels = channelsForCurrentType()
+        val bouquets = mutableListOf(Bouquet(ALL_BOUQUETS, channels.size))
 
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
-        }
-    }
-
-    private fun updateCategorySpinner() {
-        val categories = mutableListOf(ALL_CATEGORIES)
-        categories += channelsForCurrentType()
+        bouquets += channels
             .mapNotNull { it.groupTitle?.trim()?.takeIf { g -> g.isNotEmpty() } }
-            .distinct()
-            .sorted()
+            .groupingBy { it }
+            .eachCount()
+            .toSortedMap()
+            .map { (name, count) -> Bouquet(name, count) }
 
-        val spinnerAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, categories)
-        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.spinnerCategory.adapter = spinnerAdapter
+        bouquetAdapter.updateData(bouquets, currentBouquet)
     }
 
-    /** Barre de recherche par nom de chaîne, dans l'onglet/catégorie courants. */
     private fun setupSearch() {
         binding.etSearch.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
@@ -128,18 +118,17 @@ class ChannelsActivity : AppCompatActivity() {
         })
     }
 
-    /** Combine onglet + catégorie + recherche, puis rafraîchit la liste affichée. */
     private fun applyFilters() {
         var list = channelsForCurrentType()
 
-        if (currentCategory != ALL_CATEGORIES) {
-            list = list.filter { it.groupTitle == currentCategory }
+        if (currentBouquet != ALL_BOUQUETS) {
+            list = list.filter { it.groupTitle?.trim() == currentBouquet }
         }
         if (currentQuery.isNotEmpty()) {
             list = list.filter { it.name.contains(currentQuery, ignoreCase = true) }
         }
 
-        adapter.updateData(list)
+        channelAdapter.updateData(list)
         binding.tvEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
     }
 }

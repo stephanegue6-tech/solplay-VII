@@ -32,19 +32,10 @@
         android:layout_marginEnd="12dp"
         android:layout_marginTop="12dp"
         android:background="@color/solplay_gray"
-        android:hint="Rechercher une chaîne..."
+        android:hint="Rechercher..."
         android:inputType="text"
         android:maxLines="1"
         android:padding="10dp" />
-
-    <Spinner
-        android:id="@+id/spinnerCategory"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
-        android:layout_marginEnd="12dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="4dp" />
 
     <TextView
         android:id="@+id/tvEmpty"
@@ -56,10 +47,32 @@
         android:textColor="@color/solplay_text_secondary"
         android:visibility="gone" />
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerChannels"
+    <!-- Mise en page "maître-détail" : colonne de gauche = bouquets (catégories),
+         colonne de droite = chaînes du bouquet sélectionné. Évite d'avoir à parcourir
+         toutes les chaînes pour en trouver une : on choisit d'abord le bouquet. -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerBouquets"
+            android:layout_width="120dp"
+            android:layout_height="match_parent"
+            android:background="@color/solplay_gray" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:background="@color/solplay_text_secondary" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerChannels"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+    </LinearLayout>
 
 </LinearLayout>

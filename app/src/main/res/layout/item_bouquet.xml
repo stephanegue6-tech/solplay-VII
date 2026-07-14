@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="12dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="14dp"
+    android:paddingBottom="14dp"
+    android:focusable="true"
+    android:clickable="true"
+    android:background="@drawable/bg_list_item_selector">
+
+    <TextView
+        android:id="@+id/tvBouquetName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textColor="@color/text_channel_name_selector"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:maxLines="2"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/tvBouquetCount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:background="@color/solplay_gray"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
+        android:textColor="@color/solplay_text_secondary"
+        android:textSize="10sp" />
+
+</LinearLayout>
