@@ -44,6 +44,11 @@ class ChannelAdapter(
         return ChannelViewHolder(view)
     }
 
+    // ⚠️ MODE DEBUG TEMPORAIRE : affiche le statut TMDB (OK / erreur / etc.)
+    // à la place du group-title, pour diagnostiquer sans accès à Logcat/adb.
+    // Remettre à false une fois le problème identifié et corrigé.
+    private val showTmdbDebug = true
+
     override fun onBindViewHolder(holder: ChannelViewHolder, position: Int) {
         val channel = channels[position]
         holder.name.text = channel.name
@@ -55,33 +60,55 @@ class ChannelAdapter(
         holder.itemView.tag = channel
 
         if (!channel.logoUrl.isNullOrEmpty()) {
+            // Logo fourni par le M3U : on l'essaie d'abord, mais beaucoup de
+            // playlists IPTV mettent un tvg-logo générique ou cassé sur les
+            // films/séries. Si le chargement échoue (onError), on bascule
+            // sur TMDB au lieu de rester sur l'icône par défaut.
             ImageLoader.get(holder.itemView.context).load(channel.logoUrl)
                 .placeholder(R.drawable.ic_channel_placeholder)
                 .error(R.drawable.ic_channel_placeholder)
-                .into(holder.logo)
+                .into(holder.logo, object : com.squareup.picasso.Callback {
+                    override fun onSuccess() {}
+                    override fun onError(e: Exception?) {
+                        loadTmdbFallback(holder, channel)
+                    }
+                })
         } else {
             holder.logo.setImageResource(R.drawable.ic_channel_placeholder)
-            val type = channel.contentType()
-            if (type == ContentType.MOVIE || type == ContentType.SERIES) {
-                adapterScope.launch {
-                    val info = if (type == ContentType.MOVIE) {
-                        TmdbClient.searchMovie(channel.name)
-                    } else {
-                        TmdbClient.searchTv(channel.name)
-                    }
-                    // La vue a pu être recyclée pendant l'appel réseau : on
-                    // n'applique le résultat que si elle affiche toujours ce channel.
-                    if (holder.itemView.tag == channel && !info?.posterUrl.isNullOrEmpty()) {
-                        ImageLoader.get(holder.itemView.context).load(info?.posterUrl)
-                            .placeholder(R.drawable.ic_channel_placeholder)
-                            .error(R.drawable.ic_channel_placeholder)
-                            .into(holder.logo)
-                    }
-                }
-            }
+            loadTmdbFallback(holder, channel)
         }
 
         holder.itemView.setOnClickListener { onClick(channel) }
+    }
+
+    /** Recherche une affiche TMDB pour les films/séries et l'applique si le ViewHolder affiche toujours ce channel. */
+    private fun loadTmdbFallback(holder: ChannelViewHolder, channel: Channel) {
+        val type = channel.contentType()
+        if (type != ContentType.MOVIE && type != ContentType.SERIES) return
+
+        if (showTmdbDebug) holder.group.text = "TMDB: recherche…"
+
+        adapterScope.launch {
+            val result = if (type == ContentType.MOVIE) {
+                TmdbClient.searchMovie(channel.name)
+            } else {
+                TmdbClient.searchTv(channel.name)
+            }
+
+            // La vue a pu être recyclée pendant l'appel réseau : on
+            // n'applique le résultat que si elle affiche toujours ce channel.
+            if (holder.itemView.tag != channel) return@launch
+
+            if (showTmdbDebug) holder.group.text = result.debugMessage
+
+            val posterUrl = result.info?.posterUrl
+            if (!posterUrl.isNullOrEmpty()) {
+                ImageLoader.get(holder.itemView.context).load(posterUrl)
+                    .placeholder(R.drawable.ic_channel_placeholder)
+                    .error(R.drawable.ic_channel_placeholder)
+                    .into(holder.logo)
+            }
+        }
     }
 
     override fun getItemCount(): Int = channels.size

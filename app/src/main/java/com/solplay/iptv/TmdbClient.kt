@@ -1,11 +1,11 @@
 package com.solplay.iptv
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
-import java.io.IOException
 import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
 
@@ -14,6 +14,16 @@ data class TmdbInfo(
     val posterUrl: String?,
     val overview: String?,
     val year: String?
+)
+
+/**
+ * Résultat complet d'une recherche TMDB, avec un message de diagnostic
+ * lisible directement dans l'UI (utile quand on n'a pas accès à Logcat/adb,
+ * par ex. en buildant uniquement via GitHub Actions).
+ */
+data class TmdbSearchResult(
+    val info: TmdbInfo?,
+    val debugMessage: String
 )
 
 /**
@@ -37,20 +47,26 @@ object TmdbClient {
 
     // Cache en mémoire : évite de refaire un appel réseau pour chaque scroll
     // de la RecyclerView sur un titre déjà résolu (ou déjà su introuvable).
-    private val cache = ConcurrentHashMap<String, TmdbInfo?>()
+    private val cache = ConcurrentHashMap<String, TmdbSearchResult>()
 
-    suspend fun searchMovie(rawTitle: String): TmdbInfo? = search(rawTitle, "movie")
+    suspend fun searchMovie(rawTitle: String): TmdbSearchResult = search(rawTitle, "movie")
 
-    suspend fun searchTv(rawTitle: String): TmdbInfo? = search(rawTitle, "tv")
+    suspend fun searchTv(rawTitle: String): TmdbSearchResult = search(rawTitle, "tv")
 
-    private suspend fun search(rawTitle: String, type: String): TmdbInfo? {
-        if (API_KEY.isBlank()) return null
+    private suspend fun search(rawTitle: String, type: String): TmdbSearchResult {
+        if (API_KEY.isBlank()) {
+            val msg = "TMDB: clé vide (build)"
+            Log.e("TmdbClient", "TMDB_API_KEY est vide : vérifie gradle.properties et le workflow GitHub Actions (secret bien injecté avant le build ?).")
+            return TmdbSearchResult(null, msg)
+        }
 
         val title = cleanTitle(rawTitle)
-        if (title.isBlank()) return null
+        if (title.isBlank()) {
+            return TmdbSearchResult(null, "TMDB: titre vide après nettoyage")
+        }
 
         val cacheKey = "$type:$title"
-        if (cache.containsKey(cacheKey)) return cache[cacheKey]
+        cache[cacheKey]?.let { return it }
 
         return withContext(Dispatchers.IO) {
             try {
@@ -60,14 +76,20 @@ object TmdbClient {
 
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
-                        cache[cacheKey] = null
-                        return@withContext null
+                        val bodyText = response.body?.string().orEmpty()
+                        val msg = "TMDB: HTTP ${response.code}"
+                        Log.w("TmdbClient", "Échec recherche '$title' ($type) : HTTP ${response.code} - $bodyText")
+                        val result = TmdbSearchResult(null, msg)
+                        cache[cacheKey] = result
+                        return@withContext result
                     }
                     val body = response.body?.string().orEmpty()
                     val results = JSONObject(body).optJSONArray("results")
                     if (results == null || results.length() == 0) {
-                        cache[cacheKey] = null
-                        return@withContext null
+                        val msg = "TMDB: 0 résultat pour \"$title\""
+                        val result = TmdbSearchResult(null, msg)
+                        cache[cacheKey] = result
+                        return@withContext result
                     }
 
                     val first = results.getJSONObject(0)
@@ -80,11 +102,18 @@ object TmdbClient {
                         overview = first.optString("overview", "").ifBlank { null },
                         year = date.take(4).ifBlank { null }
                     )
-                    cache[cacheKey] = info
-                    info
+                    val msg = if (info.posterUrl != null) "TMDB: OK (${info.year ?: "?"})" else "TMDB: trouvé mais sans affiche"
+                    val result = TmdbSearchResult(info, msg)
+                    cache[cacheKey] = result
+                    result
                 }
-            } catch (e: IOException) {
-                null // Pas de cache sur une erreur réseau : on retentera au prochain bind/scroll.
+            } catch (e: Exception) {
+                // Volontairement large (réseau, JSON malformé, etc.) : une
+                // erreur TMDB ne doit jamais faire planter la RecyclerView,
+                // juste laisser l'icône par défaut affichée.
+                val msg = "TMDB: erreur ${e.javaClass.simpleName}: ${e.message}"
+                Log.e("TmdbClient", "Erreur recherche '$title' ($type) : ${e.message}", e)
+                TmdbSearchResult(null, msg) // Pas de cache sur une erreur : on retentera au prochain bind/scroll.
             }
         }
     }
