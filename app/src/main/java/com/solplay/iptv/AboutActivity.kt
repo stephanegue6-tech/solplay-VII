@@ -21,6 +21,7 @@ class AboutActivity : AppCompatActivity() {
 
         // 1) Affiche d'abord le statut connu localement (rapide, fonctionne hors-ligne).
         updateStatusText(binding, TrialManager.isLicensed(this))
+        binding.tvDebugOffset.text = TrialManager.getDebugOffsetInfo(this)
 
         // 2) Vérifie systématiquement en ligne (Firebase), même si l'app se
         //    croit déjà licenciée localement : sinon, si l'admin change la
@@ -32,6 +33,7 @@ class AboutActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val active = TrialManager.checkOnlineLicense(this@AboutActivity)
             updateStatusText(binding, active)
+            binding.tvDebugOffset.text = TrialManager.getDebugOffsetInfo(this@AboutActivity)
         }
 
         // Se met à jour chaque minute tant que l'écran est affiché, pour rester
