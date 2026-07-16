@@ -2,6 +2,8 @@ package com.solplay.iptv
 
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -63,9 +65,18 @@ object XtreamApiClient {
                 val pass = playlist.xtreamPassword.trim()
                 if (base.isEmpty() || user.isEmpty() || pass.isEmpty()) return@withContext emptyMap()
 
-                val categories = fetchJsonArray(
-                    "$base/player_api.php?username=$user&password=$pass&action=${kind.categoriesAction}"
-                ) ?: return@withContext emptyMap()
+                // Les deux appels sont indépendants : on les lance en parallèle au lieu
+                // d'attendre le premier avant de démarrer le second (gain notable sur
+                // un serveur qui met une seconde ou plus à répondre à chaque requête).
+                val categoriesDeferred = async {
+                    fetchJsonArray("$base/player_api.php?username=$user&password=$pass&action=${kind.categoriesAction}")
+                }
+                val streamsDeferred = async {
+                    fetchJsonArray("$base/player_api.php?username=$user&password=$pass&action=${kind.streamsAction}")
+                }
+
+                val categories = categoriesDeferred.await() ?: return@withContext emptyMap()
+                val streams = streamsDeferred.await() ?: return@withContext emptyMap()
 
                 val categoryNames = mutableMapOf<String, String>()
                 for (i in 0 until categories.length()) {
@@ -74,10 +85,6 @@ object XtreamApiClient {
                     val name = c.optString("category_name")
                     if (id.isNotEmpty() && name.isNotEmpty()) categoryNames[id] = name
                 }
-
-                val streams = fetchJsonArray(
-                    "$base/player_api.php?username=$user&password=$pass&action=${kind.streamsAction}"
-                ) ?: return@withContext emptyMap()
 
                 val result = mutableMapOf<Int, StreamInfo>()
                 for (i in 0 until streams.length()) {
@@ -149,8 +156,16 @@ object XtreamApiClient {
         }
         if (!needsVod && !needsLive) return channels
 
-        val vodMap = if (needsVod) fetchStreamInfoMap(playlist, Kind.VOD) else emptyMap()
-        val liveMap = if (needsLive) fetchStreamInfoMap(playlist, Kind.LIVE) else emptyMap()
+        // Indépendants l'un de l'autre : lancés en parallèle plutôt que d'attendre
+        // la fin du premier avant de démarrer le second.
+        val vodMap: Map<Int, StreamInfo>
+        val liveMap: Map<Int, StreamInfo>
+        coroutineScope {
+            val vodDeferred = async { if (needsVod) fetchStreamInfoMap(playlist, Kind.VOD) else emptyMap() }
+            val liveDeferred = async { if (needsLive) fetchStreamInfoMap(playlist, Kind.LIVE) else emptyMap() }
+            vodMap = vodDeferred.await()
+            liveMap = liveDeferred.await()
+        }
         if (vodMap.isEmpty() && liveMap.isEmpty()) return channels
 
         return channels.map { channel ->

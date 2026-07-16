@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>SolPlay — Panneau Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --orange: #FF7A00;
+    --green: #2E9E4F;
+    --white: #FFFFFF;
+    --black: #1A1A1A;
+    --gray: #F2F2F2;
+    --red: #c0392b;
+  }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: var(--gray);
+    margin: 0;
+    color: var(--black);
+  }
+  header {
+    background: var(--orange);
+    color: white;
+    padding: 16px 24px;
+    font-size: 22px;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  #connStatus { font-size: 12px; font-weight: normal; padding: 4px 10px; border-radius: 10px; }
+  #connStatus.ok { background: rgba(255,255,255,0.25); }
+  #connStatus.bad { background: var(--red); }
+  .container { max-width: 760px; margin: 24px auto; padding: 0 16px; }
+  .card {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+  input, select {
+    width: 100%;
+    padding: 10px;
+    margin: 6px 0 14px 0;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-sizing: border-box;
+    font-size: 14px;
+  }
+  button {
+    background: var(--orange);
+    color: white;
+    border: none;
+    padding: 12px 18px;
+    border-radius: 6px;
+    font-size: 15px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  button.green { background: var(--green); }
+  button.outline { background: white; color: var(--orange); border: 1px solid var(--orange); }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; font-size: 13px; }
+  .badge { padding: 3px 8px; border-radius: 10px; font-size: 12px; color: white; }
+  .badge.active { background: var(--green); }
+  .badge.inactive { background: #999; }
+  .badge.expired { background: var(--red); }
+  #loginBox, #adminBox { display: none; }
+  label { font-size: 13px; color: #555; }
+  .msg-ok { color: var(--green); font-weight: bold; }
+  .msg-err { color: var(--red); font-weight: bold; }
+  .duration-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+  .duration-tabs label { display: flex; align-items: center; gap: 4px; font-size: 13px; background: var(--gray); padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+  .hint { font-size: 12px; color: #888; margin-top: -10px; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  🟠 SolPlay — Panneau Administrateur
+  <span id="connStatus">Connexion...</span>
+</header>
+
+<div class="container">
+
+  <div class="card" id="loginBox">
+    <h3>Connexion admin</h3>
+    <label>Email</label>
+    <input id="loginEmail" type="email" placeholder="ton-email@exemple.com">
+    <label>Mot de passe</label>
+    <input id="loginPassword" type="password" placeholder="Mot de passe">
+    <button onclick="login()">Se connecter</button>
+    <p id="loginError" class="msg-err"></p>
+  </div>
+
+  <div id="adminBox">
+    <div class="card">
+      <h3>Activer une licence</h3>
+      <label>Clé appareil du client (fournie par le client depuis l'app)</label>
+      <input id="deviceKeyInput" placeholder="Ex: A1B2C3D4E5F6G7H8">
+      <label>Nom du client (optionnel)</label>
+      <input id="customerName" placeholder="Ex: Jean Kouassi">
+      <label>Email / téléphone du client (optionnel)</label>
+      <input id="customerContact" placeholder="Ex: jean@exemple.com ou 07...">
+
+      <label>Durée de l'abonnement</label>
+      <div class="duration-tabs">
+        <label><input type="radio" name="durationMode" value="test" checked onclick="toggleDurationMode()"> 🧪 Test (heures)</label>
+        <label><input type="radio" name="durationMode" value="normal" onclick="toggleDurationMode()"> 💳 Abonnement (mois)</label>
+        <label><input type="radio" name="durationMode" value="unlimited" onclick="toggleDurationMode()"> ♾️ Illimité</label>
+      </div>
+
+      <div id="durationTestBlock">
+        <label>Durée du test</label>
+        <select id="durationTestSelect">
+          <option value="1">1 heure</option>
+          <option value="2">2 heures</option>
+          <option value="3">3 heures</option>
+          <option value="6">6 heures</option>
+          <option value="12">12 heures</option>
+          <option value="24" selected>24 heures</option>
+        </select>
+      </div>
+
+      <div id="durationNormalBlock" style="display:none;">
+        <label>Durée de l'abonnement</label>
+        <select id="durationNormalSelect">
+          <option value="1">1 mois</option>
+          <option value="3">3 mois</option>
+          <option value="6">6 mois</option>
+          <option value="12" selected>12 mois</option>
+        </select>
+      </div>
+
+      <p class="hint" id="durationUnlimitedHint" style="display:none;">Aucune date d'expiration ne sera appliquée (à utiliser avec parcimonie).</p>
+
+      <button class="green" onclick="activateLicense()">✅ Activer cette clé</button>
+      <button class="outline" onclick="deactivateLicense()">Désactiver cette clé</button>
+      <p id="activateMsg"></p>
+    </div>
+
+    <div class="card">
+      <h3>📤 Assigner une playlist à cet appareil (sans code)</h3>
+      <p style="font-size:13px; color:#555; margin-top:-6px;">
+        Utilise la <b>clé appareil</b> saisie ci-dessus. La playlist apparaîtra
+        automatiquement dans "Mes playlists" sur le téléphone du client, sans
+        qu'il ait besoin de saisir quoi que ce soit.
+      </p>
+
+      <label>Nom de la playlist (affiché au client)</label>
+      <input id="devicePlaylistName" placeholder="Ex: Pack Premium FR">
+
+      <label>Type</label>
+      <div style="margin-bottom:14px;">
+        <label style="margin-right:16px; display:inline;">
+          <input type="radio" name="devicePlaylistType" value="m3u" checked onclick="toggleDevicePlaylistType()"> Lien M3U
+        </label>
+        <label style="display:inline;">
+          <input type="radio" name="devicePlaylistType" value="xtream" onclick="toggleDevicePlaylistType()"> Xtream Codes
+        </label>
+      </div>
+
+      <div id="devicePlaylistM3uBlock">
+        <label>Lien M3U</label>
+        <input id="devicePlaylistM3uUrl" placeholder="http://exemple.com/playlist.m3u">
+      </div>
+
+      <div id="devicePlaylistXtreamBlock" style="display:none;">
+        <label>Serveur Xtream</label>
+        <input id="devicePlaylistXtreamServer" placeholder="http://exemple.com:8080">
+        <label>Nom d'utilisateur</label>
+        <input id="devicePlaylistXtreamUsername">
+        <label>Mot de passe</label>
+        <input id="devicePlaylistXtreamPassword">
+      </div>
+
+      <button class="green" onclick="assignPlaylistToDevice()">📤 Assigner cette playlist à l'appareil</button>
+      <button class="outline" onclick="clearDevicePlaylistForm()">Nouvelle playlist (vider le formulaire)</button>
+      <p id="devicePlaylistMsg"></p>
+
+      <button class="outline" onclick="loadDevicePlaylists()" style="margin-top:10px;">🔄 Voir les playlists assignées à cette clé</button>
+      <table id="devicePlaylistTable">
+        <thead>
+          <tr><th>Nom</th><th>Type</th><th>Statut</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="devicePlaylistTableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Licences enregistrées</h3>
+      <button class="outline" onclick="loadLicenses()">🔄 Rafraîchir la liste</button>
+      <table id="licenseTable">
+        <thead>
+          <tr><th>Clé appareil</th><th>Client</th><th>Statut</th><th>Plan</th><th>Expire le</th><th>Temps restant</th></tr>
+        </thead>
+        <tbody id="licenseTableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Codes M3U / Xtream</h3>
+      <label>Code (identifiant unique, sans espace)</label>
+      <input id="codeInput" placeholder="Ex: SOLPLAY123">
+      <label>Nom de la playlist (affiché au client dans l'app)</label>
+      <input id="codeName" placeholder="Ex: Pack Premium FR">
+
+      <label>Type</label>
+      <div style="margin-bottom:14px;">
+        <label style="margin-right:16px; display:inline;">
+          <input type="radio" name="codeType" value="m3u" checked onclick="toggleCodeType()"> Lien M3U
+        </label>
+        <label style="display:inline;">
+          <input type="radio" name="codeType" value="xtream" onclick="toggleCodeType()"> Xtream Codes
+        </label>
+      </div>
+
+      <div id="codeM3uBlock">
+        <label>Lien M3U</label>
+        <input id="codeM3uUrl" placeholder="http://exemple.com/playlist.m3u">
+      </div>
+
+      <div id="codeXtreamBlock" style="display:none;">
+        <label>Serveur Xtream</label>
+        <input id="codeXtreamServer" placeholder="http://exemple.com:8080">
+        <label>Nom d'utilisateur</label>
+        <input id="codeXtreamUsername">
+        <label>Mot de passe</label>
+        <input id="codeXtreamPassword">
+      </div>
+
+      <button class="green" onclick="saveCode()">💾 Enregistrer le code</button>
+      <button class="outline" onclick="clearCodeForm()">Nouveau code (vider le formulaire)</button>
+      <p id="codeMsg"></p>
+    </div>
+
+    <div class="card">
+      <h3>Codes enregistrés</h3>
+      <button class="outline" onclick="loadCodes()">🔄 Rafraîchir la liste</button>
+      <table id="codeTable">
+        <thead>
+          <tr><th>Code</th><th>Nom</th><th>Type</th><th>Statut</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="codeTableBody"></tbody>
+      </table>
+    </div>
+
+    <button class="outline" onclick="logout()">Se déconnecter</button>
+  </div>
+
+</div>
+
+<!-- Firebase SDK (via CDN) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<script>
+// ⚠️ COLLE TA CONFIGURATION FIREBASE ICI (voir FIREBASE_SETUP.md, étape 4)
+const firebaseConfig = {
+  apiKey: "AIzaSyAQxSB3M7SkF65Q44u7N1jvW-eZ2i7zjyQ",
+  authDomain: "solplay-2ec6c.firebaseapp.com",
+  databaseURL: "https://solplay-2ec6c-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "solplay-2ec6c",
+  storageBucket: "solplay-2ec6c.firebasestorage.app",
+  messagingSenderId: "359488467526",
+  appId: "1:359488467526:web:8fa620d2633a5cb303d047"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+
+// ---------------------------------------------------------------------
+// Diagnostic de connexion : aide à comprendre pourquoi "rien ne sauvegarde"
+// (le plus souvent : règles de sécurité Firebase qui bloquent l'écriture,
+// ou pas de connexion réseau). Le badge en haut à droite reflète l'état réel.
+// ---------------------------------------------------------------------
+const connStatusEl = document.getElementById('connStatus');
+db.ref('.info/connected').on('value', (snap) => {
+  if (snap.val() === true) {
+    connStatusEl.textContent = '🟢 Connecté';
+    connStatusEl.className = 'ok';
+  } else {
+    connStatusEl.textContent = '🔴 Hors-ligne';
+    connStatusEl.className = 'bad';
+  }
+});
+
+function showError(elementId, err) {
+  console.error(err);
+  const el = document.getElementById(elementId);
+  const code = err && err.code ? ' (' + err.code + ')' : '';
+  el.innerHTML = '<span class="msg-err">❌ Erreur : ' + (err && err.message ? err.message : err) + code + '</span>';
+  // Les erreurs "PERMISSION_DENIED" viennent presque toujours des règles de
+  // sécurité de la Realtime Database (onglet "Rules" dans la console
+  // Firebase) : il faut que l'utilisateur admin connecté ait le droit
+  // d'écrire sous /licenses, /device_playlists et /playlist_codes.
+  if (err && (err.code === 'PERMISSION_DENIED' || (err.message || '').includes('permission_denied'))) {
+    alert("Échec de l'enregistrement : accès refusé par les règles de sécurité Firebase (PERMISSION_DENIED).\n\nVérifie dans la console Firebase > Realtime Database > Rules que ton compte admin a bien le droit d'écrire.");
+  }
+}
+
+auth.onAuthStateChanged((user) => {
+  if (user) {
+    document.getElementById('loginBox').style.display = 'none';
+    document.getElementById('adminBox').style.display = 'block';
+    loadLicenses();
+    loadCodes();
+  } else {
+    document.getElementById('loginBox').style.display = 'block';
+    document.getElementById('adminBox').style.display = 'none';
+  }
+});
+
+function login() {
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+  auth.signInWithEmailAndPassword(email, password)
+    .catch((err) => {
+      document.getElementById('loginError').innerText = "Erreur : " + err.message;
+    });
+}
+
+function logout() {
+  auth.signOut();
+}
+
+// ---------------------------------------------------------------------
+// Durées d'abonnement (Test en heures / Abonnement en mois / Illimité)
+// ---------------------------------------------------------------------
+
+function toggleDurationMode() {
+  const mode = document.querySelector('input[name="durationMode"]:checked').value;
+  document.getElementById('durationTestBlock').style.display = mode === 'test' ? 'block' : 'none';
+  document.getElementById('durationNormalBlock').style.display = mode === 'normal' ? 'block' : 'none';
+  document.getElementById('durationUnlimitedHint').style.display = mode === 'unlimited' ? 'block' : 'none';
+}
+
+const MS_PER_HOUR = 1000 * 60 * 60;
+const MS_PER_DAY = MS_PER_HOUR * 24;
+
+/** Retourne { durationMs (0 = illimité), planLabel } selon le mode choisi. */
+function getSelectedDuration() {
+  const mode = document.querySelector('input[name="durationMode"]:checked').value;
+  if (mode === 'unlimited') {
+    return { durationMs: 0, planLabel: 'Illimité' };
+  }
+  if (mode === 'test') {
+    const hours = parseInt(document.getElementById('durationTestSelect').value, 10);
+    return { durationMs: hours * MS_PER_HOUR, planLabel: 'Test ' + hours + 'h' };
+  }
+  // normal (mois) — approximation standard : 30 jours par mois
+  const months = parseInt(document.getElementById('durationNormalSelect').value, 10);
+  return { durationMs: months * 30 * MS_PER_DAY, planLabel: months + ' mois' };
+}
+
+function activateLicense() {
+  const key = document.getElementById('deviceKeyInput').value.trim();
+  const name = document.getElementById('customerName').value.trim();
+  const contact = document.getElementById('customerContact').value.trim();
+  if (!key) { alert("Merci de saisir une clé appareil."); return; }
+
+  const { durationMs, planLabel } = getSelectedDuration();
+  const now = Date.now();
+  const expiresAt = durationMs === 0 ? 0 : (now + durationMs);
+
+  document.getElementById('activateMsg').innerText = '⏳ Enregistrement en cours...';
+
+  db.ref('licenses/' + key).set({
+    active: true,
+    customerName: name,
+    customerContact: contact,
+    activatedAt: new Date().toISOString(),
+    expiresAt: expiresAt,
+    planLabel: planLabel
+  }).then(() => {
+    document.getElementById('activateMsg').innerHTML = '<span class="msg-ok">✅ Licence activée pour ' + key + ' (' + planLabel + ')</span>';
+    loadLicenses();
+  }).catch((err) => showError('activateMsg', err));
+}
+
+function deactivateLicense() {
+  const key = document.getElementById('deviceKeyInput').value.trim();
+  if (!key) { alert("Merci de saisir une clé appareil."); return; }
+
+  db.ref('licenses/' + key + '/active').set(false).then(() => {
+    document.getElementById('activateMsg').innerHTML = 'Licence désactivée pour ' + key;
+    loadLicenses();
+  }).catch((err) => showError('activateMsg', err));
+}
+
+function formatRemaining(ms) {
+  if (ms <= 0) return 'Expiré';
+  const totalMinutes = Math.floor(ms / 60000);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return days + 'j ' + hours + 'h';
+  if (hours > 0) return hours + 'h ' + minutes + 'min';
+  return minutes + 'min';
+}
+
+function loadLicenses() {
+  db.ref('licenses').once('value').then((snapshot) => {
+    const tbody = document.getElementById('licenseTableBody');
+    tbody.innerHTML = '';
+    snapshot.forEach((child) => {
+      const data = child.val();
+      const now = Date.now();
+      const expiresAt = data.expiresAt || 0;
+      const isExpired = data.active && expiresAt !== 0 && expiresAt < now;
+      const row = document.createElement('tr');
+
+      let statusBadge;
+      if (!data.active) {
+        statusBadge = '<span class="badge inactive">Inactive</span>';
+      } else if (isExpired) {
+        statusBadge = '<span class="badge expired">Expirée</span>';
+      } else {
+        statusBadge = '<span class="badge active">Active</span>';
+      }
+
+      const expiryText = expiresAt === 0 ? 'Sans expiration' : new Date(expiresAt).toLocaleString('fr-FR');
+      const remainingText = expiresAt === 0 ? '—' : formatRemaining(expiresAt - now);
+
+      row.innerHTML = `
+        <td>${child.key}</td>
+        <td>${data.customerName || ''} ${data.customerContact ? '('+data.customerContact+')' : ''}</td>
+        <td>${statusBadge}</td>
+        <td>${data.planLabel || ''}</td>
+        <td>${expiryText}</td>
+        <td>${remainingText}</td>
+      `;
+      tbody.appendChild(row);
+    });
+  }).catch((err) => {
+    console.error(err);
+    alert("Impossible de charger les licences : " + err.message);
+  });
+}
+
+// ---- Playlists assignées directement par clé appareil (sans code) ----
+
+let editingDevicePlaylistId = null;
+
+function toggleDevicePlaylistType() {
+  const type = document.querySelector('input[name="devicePlaylistType"]:checked').value;
+  document.getElementById('devicePlaylistM3uBlock').style.display = type === 'm3u' ? 'block' : 'none';
+  document.getElementById('devicePlaylistXtreamBlock').style.display = type === 'xtream' ? 'block' : 'none';
+}
+
+function assignPlaylistToDevice() {
+  const key = document.getElementById('deviceKeyInput').value.trim();
+  const name = document.getElementById('devicePlaylistName').value.trim();
+  const type = document.querySelector('input[name="devicePlaylistType"]:checked').value;
+  if (!key) { alert("Merci de saisir la clé appareil du client (en haut)."); return; }
+  if (!name) { alert("Merci de saisir un nom pour la playlist."); return; }
+
+  const data = { name: name, type: type, active: true, updatedAt: new Date().toISOString() };
+
+  if (type === 'xtream') {
+    const server = document.getElementById('devicePlaylistXtreamServer').value.trim();
+    const username = document.getElementById('devicePlaylistXtreamUsername').value.trim();
+    const password = document.getElementById('devicePlaylistXtreamPassword').value.trim();
+    if (!server || !username || !password) { alert("Merci de remplir les champs Xtream."); return; }
+    data.xtreamServer = server;
+    data.xtreamUsername = username;
+    data.xtreamPassword = password;
+  } else {
+    const m3uUrl = document.getElementById('devicePlaylistM3uUrl').value.trim();
+    if (!m3uUrl) { alert("Merci de saisir le lien M3U."); return; }
+    data.m3uUrl = m3uUrl;
+  }
+
+  const ref = editingDevicePlaylistId
+    ? db.ref('device_playlists/' + key + '/' + editingDevicePlaylistId)
+    : db.ref('device_playlists/' + key).push();
+
+  document.getElementById('devicePlaylistMsg').innerText = '⏳ Enregistrement en cours...';
+
+  ref.update(data).then(() => {
+    document.getElementById('devicePlaylistMsg').innerHTML = '<span class="msg-ok">✅ Playlist assignée à l\'appareil ' + key + '. Elle apparaîtra automatiquement chez le client.</span>';
+    clearDevicePlaylistForm();
+    loadDevicePlaylists();
+  }).catch((err) => showError('devicePlaylistMsg', err));
+}
+
+function clearDevicePlaylistForm() {
+  editingDevicePlaylistId = null;
+  document.getElementById('devicePlaylistName').value = '';
+  document.getElementById('devicePlaylistM3uUrl').value = '';
+  document.getElementById('devicePlaylistXtreamServer').value = '';
+  document.getElementById('devicePlaylistXtreamUsername').value = '';
+  document.getElementById('devicePlaylistXtreamPassword').value = '';
+  document.querySelector('input[name="devicePlaylistType"][value="m3u"]').checked = true;
+  toggleDevicePlaylistType();
+}
+
+function loadDevicePlaylists() {
+  const key = document.getElementById('deviceKeyInput').value.trim();
+  if (!key) { alert("Merci de saisir la clé appareil du client (en haut)."); return; }
+
+  db.ref('device_playlists/' + key).once('value').then((snapshot) => {
+    const tbody = document.getElementById('devicePlaylistTableBody');
+    tbody.innerHTML = '';
+    snapshot.forEach((child) => {
+      const data = child.val();
+      const row = document.createElement('tr');
+      const statusBadge = data.active
+        ? '<span class="badge active">Active</span>'
+        : '<span class="badge inactive">Inactive</span>';
+      const typeLabel = data.type === 'xtream' ? 'Xtream' : 'M3U';
+      row.innerHTML = `
+        <td>${data.name || ''}</td>
+        <td>${typeLabel}</td>
+        <td>${statusBadge}</td>
+        <td></td>
+      `;
+      const actionsTd = row.lastElementChild;
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'outline';
+      editBtn.style.cssText = 'margin-right:4px; padding:6px 10px; font-size:12px;';
+      editBtn.innerText = 'Modifier';
+      editBtn.onclick = () => {
+        editingDevicePlaylistId = child.key;
+        document.getElementById('devicePlaylistName').value = data.name || '';
+        document.querySelector('input[name="devicePlaylistType"][value="' + data.type + '"]').checked = true;
+        toggleDevicePlaylistType();
+        if (data.type === 'xtream') {
+          document.getElementById('devicePlaylistXtreamServer').value = data.xtreamServer || '';
+          document.getElementById('devicePlaylistXtreamUsername').value = data.xtreamUsername || '';
+          document.getElementById('devicePlaylistXtreamPassword').value = data.xtreamPassword || '';
+        } else {
+          document.getElementById('devicePlaylistM3uUrl').value = data.m3uUrl || '';
+        }
+        window.scrollTo(0, 0);
+      };
+      actionsTd.appendChild(editBtn);
+
+      const toggleBtn = document.createElement('button');
+      toggleBtn.className = data.active ? 'outline' : 'green';
+      toggleBtn.style.cssText = 'margin-right:4px; padding:6px 10px; font-size:12px;';
+      toggleBtn.innerText = data.active ? 'Retirer' : 'Réactiver';
+      toggleBtn.onclick = () => {
+        db.ref('device_playlists/' + key + '/' + child.key + '/active').set(!data.active)
+          .then(loadDevicePlaylists)
+          .catch((err) => alert("Erreur : " + err.message));
+      };
+      actionsTd.appendChild(toggleBtn);
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.style.cssText = 'background:#c0392b; padding:6px 10px; font-size:12px;';
+      deleteBtn.innerText = 'Supprimer';
+      deleteBtn.onclick = () => {
+        if (!confirm("Supprimer définitivement cette playlist assignée ?")) return;
+        db.ref('device_playlists/' + key + '/' + child.key).remove()
+          .then(loadDevicePlaylists)
+          .catch((err) => alert("Erreur : " + err.message));
+      };
+      actionsTd.appendChild(deleteBtn);
+
+      tbody.appendChild(row);
+    });
+  }).catch((err) => {
+    console.error(err);
+    alert("Impossible de charger les playlists : " + err.message);
+  });
+}
+
+// ---- Codes M3U / Xtream ----
+
+function toggleCodeType() {
+  const type = document.querySelector('input[name="codeType"]:checked').value;
+  document.getElementById('codeM3uBlock').style.display = type === 'm3u' ? 'block' : 'none';
+  document.getElementById('codeXtreamBlock').style.display = type === 'xtream' ? 'block' : 'none';
+}
+
+function saveCode() {
+  const code = document.getElementById('codeInput').value.trim();
+  const name = document.getElementById('codeName').value.trim();
+  const type = document.querySelector('input[name="codeType"]:checked').value;
+  if (!code) { alert("Merci de saisir un code."); return; }
+  if (!name) { alert("Merci de saisir un nom pour la playlist."); return; }
+
+  const data = { name: name, type: type, active: true, updatedAt: new Date().toISOString() };
+
+  if (type === 'xtream') {
+    const server = document.getElementById('codeXtreamServer').value.trim();
+    const username = document.getElementById('codeXtreamUsername').value.trim();
+    const password = document.getElementById('codeXtreamPassword').value.trim();
+    if (!server || !username || !password) { alert("Merci de remplir les champs Xtream."); return; }
+    data.xtreamServer = server;
+    data.xtreamUsername = username;
+    data.xtreamPassword = password;
+  } else {
+    const m3uUrl = document.getElementById('codeM3uUrl').value.trim();
+    if (!m3uUrl) { alert("Merci de saisir le lien M3U."); return; }
+    data.m3uUrl = m3uUrl;
+  }
+
+  document.getElementById('codeMsg').innerText = '⏳ Enregistrement en cours...';
+
+  db.ref('playlist_codes/' + code).update(data).then(() => {
+    document.getElementById('codeMsg').innerHTML = '<span class="msg-ok">✅ Code ' + code + ' enregistré.</span>';
+    loadCodes();
+  }).catch((err) => showError('codeMsg', err));
+}
+
+function clearCodeForm() {
+  document.getElementById('codeInput').value = '';
+  document.getElementById('codeName').value = '';
+  document.getElementById('codeM3uUrl').value = '';
+  document.getElementById('codeXtreamServer').value = '';
+  document.getElementById('codeXtreamUsername').value = '';
+  document.getElementById('codeXtreamPassword').value = '';
+  document.querySelector('input[name="codeType"][value="m3u"]').checked = true;
+  toggleCodeType();
+  document.getElementById('codeMsg').innerText = '';
+}
+
+function editCode(code) {
+  db.ref('playlist_codes/' + code).once('value').then((snapshot) => {
+    const data = snapshot.val();
+    if (!data) return;
+    document.getElementById('codeInput').value = code;
+    document.getElementById('codeName').value = data.name || '';
+    document.querySelector('input[name="codeType"][value="' + data.type + '"]').checked = true;
+    toggleCodeType();
+    if (data.type === 'xtream') {
+      document.getElementById('codeXtreamServer').value = data.xtreamServer || '';
+      document.getElementById('codeXtreamUsername').value = data.xtreamUsername || '';
+      document.getElementById('codeXtreamPassword').value = data.xtreamPassword || '';
+    } else {
+      document.getElementById('codeM3uUrl').value = data.m3uUrl || '';
+    }
+    window.scrollTo(0, 0);
+  }).catch((err) => alert("Erreur : " + err.message));
+}
+
+function toggleCodeActive(code, newState) {
+  db.ref('playlist_codes/' + code + '/active').set(newState)
+    .then(loadCodes)
+    .catch((err) => alert("Erreur : " + err.message));
+}
+
+function deleteCode(code) {
+  if (!confirm("Supprimer définitivement le code " + code + " ?")) return;
+  db.ref('playlist_codes/' + code).remove()
+    .then(loadCodes)
+    .catch((err) => alert("Erreur : " + err.message));
+}
+
+function loadCodes() {
+  db.ref('playlist_codes').once('value').then((snapshot) => {
+    const tbody = document.getElementById('codeTableBody');
+    tbody.innerHTML = '';
+    snapshot.forEach((child) => {
+      const data = child.val();
+      const row = document.createElement('tr');
+      const statusBadge = data.active
+        ? '<span class="badge active">Actif</span>'
+        : '<span class="badge inactive">Inactif</span>';
+      const typeLabel = data.type === 'xtream' ? 'Xtream' : 'M3U';
+      row.innerHTML = `
+        <td>${child.key}</td>
+        <td>${data.name || ''}</td>
+        <td>${typeLabel}</td>
+        <td>${statusBadge}</td>
+        <td></td>
+      `;
+      const actionsTd = row.lastElementChild;
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'outline';
+      editBtn.style.cssText = 'margin-right:4px; padding:6px 10px; font-size:12px;';
+      editBtn.innerText = 'Modifier';
+      editBtn.onclick = () => editCode(child.key);
+      actionsTd.appendChild(editBtn);
+
+      const toggleBtn = document.createElement('button');
+      toggleBtn.className = data.active ? 'outline' : 'green';
+      toggleBtn.style.cssText = 'margin-right:4px; padding:6px 10px; font-size:12px;';
+      toggleBtn.innerText = data.active ? 'Désactiver' : 'Activer';
+      toggleBtn.onclick = () => toggleCodeActive(child.key, !data.active);
+      actionsTd.appendChild(toggleBtn);
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.style.cssText = 'background:#c0392b; padding:6px 10px; font-size:12px;';
+      deleteBtn.innerText = 'Supprimer';
+      deleteBtn.onclick = () => deleteCode(child.key);
+      actionsTd.appendChild(deleteBtn);
+
+      tbody.appendChild(row);
+    });
+  }).catch((err) => {
+    console.error(err);
+    alert("Impossible de charger les codes : " + err.message);
+  });
+}
+</script>
+
+</body>
+</html>

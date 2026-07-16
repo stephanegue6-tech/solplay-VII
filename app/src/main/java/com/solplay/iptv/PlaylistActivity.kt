@@ -203,7 +203,14 @@ class PlaylistActivity : AppCompatActivity() {
             "Connexion au serveur…\nCela peut prendre du temps sur les grosses playlists, merci de patienter."
         lifecycleScope.launch {
             try {
-                val parsed = withContext(Dispatchers.IO) { M3uParser.fetchAndParse(playlist.buildUrl()) }
+                val parsed = withContext(Dispatchers.IO) {
+                    M3uParser.fetchAndParse(playlist.buildUrl()) { attempt, maxAttempts ->
+                        runOnUiThread {
+                            binding.tvLoadingStatus.text =
+                                "Connexion interrompue, nouvelle tentative ($attempt/$maxAttempts)…"
+                        }
+                    }
+                }
                 binding.tvLoadingStatus.text = "${parsed.size} chaînes trouvées, classement en catégories…"
                 val channels = XtreamApiClient.enrichChannelsWithCategories(playlist, parsed)
                 binding.progressBar.visibility = android.view.View.GONE

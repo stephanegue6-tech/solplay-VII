@@ -17,6 +17,9 @@ data class Channel(
 /** Exception avec un message clair destiné à être affiché directement à l'utilisateur. */
 class PlaylistLoadException(message: String) : Exception(message)
 
+/** Coupure réseau jugée transitoire (ex: "unexpected end of stream") : vaut le coup de réessayer. */
+private class TransientNetworkException(message: String) : Exception(message)
+
 object M3uParser {
 
     /**
@@ -25,31 +28,39 @@ object M3uParser {
      * sans jamais charger tout le fichier en mémoire d'un coup : plus rapide et
      * plus léger pour les grosses playlists (10 000+ chaînes).
      *
-     * Réessaie automatiquement en cas de coupure réseau transitoire (ex: "unexpected
-     * end of stream"), fréquente avec certains panels IPTV qui ferment la connexion
-     * prématurément. On ne remonte l'erreur à l'utilisateur qu'après plusieurs échecs.
+     * Réessaie automatiquement (jusqu'à 3 tentatives) uniquement en cas de coupure
+     * réseau jugée transitoire (ex: "unexpected end of stream", fréquente avec
+     * certains panels IPTV qui ferment la connexion prématurément). Un vrai timeout
+     * ou un serveur injoignable, en revanche, échoue immédiatement sans réessayer :
+     * réessayer n'y changerait rien et ferait juste attendre l'utilisateur pour rien.
+     *
+     * [onRetry] est appelé avant chaque nouvelle tentative (utile pour informer
+     * l'utilisateur via l'UI que ce n'est pas figé, ex: "Nouvelle tentative 2/3…").
      */
-    fun fetchAndParse(playlistUrl: String): List<Channel> {
+    fun fetchAndParse(playlistUrl: String, onRetry: ((attempt: Int, maxAttempts: Int) -> Unit)? = null): List<Channel> {
         val maxAttempts = 3
-        var lastError: PlaylistLoadException? = null
 
         for (attempt in 1..maxAttempts) {
             try {
                 return fetchAndParseOnce(playlistUrl)
-            } catch (e: PlaylistLoadException) {
-                lastError = e
-                if (attempt < maxAttempts) {
-                    Thread.sleep(800L * attempt) // petite pause avant de réessayer
+            } catch (e: TransientNetworkException) {
+                if (attempt >= maxAttempts) {
+                    throw PlaylistLoadException(
+                        "Erreur réseau pendant le chargement : ${e.message}. " +
+                            "La connexion a été coupée plusieurs fois de suite, le serveur est peut-être surchargé."
+                    )
                 }
+                onRetry?.invoke(attempt + 1, maxAttempts)
+                Thread.sleep(700L * attempt) // petite pause avant de réessayer
             }
         }
-        throw lastError ?: PlaylistLoadException("Erreur réseau inconnue pendant le chargement.")
+        throw PlaylistLoadException("Erreur réseau inconnue pendant le chargement.")
     }
 
     private fun fetchAndParseOnce(playlistUrl: String): List<Channel> {
         val connection = URL(playlistUrl).openConnection() as HttpURLConnection
         connection.connectTimeout = 20000   // 20s pour établir la connexion
-        connection.readTimeout = 120000     // 120s pour le téléchargement/lecture
+        connection.readTimeout = 60000      // 60s pour le téléchargement/lecture
         connection.requestMethod = "GET"
         connection.instanceFollowRedirects = true
         // Empêche la réutilisation d'une connexion Keep-Alive potentiellement déjà
@@ -75,20 +86,22 @@ object M3uParser {
                 parseStream(reader)
             }
         } catch (e: SocketTimeoutException) {
+            // Vrai timeout : pas transitoire, inutile de réessayer automatiquement.
             throw PlaylistLoadException(
                 "Le serveur met trop de temps à répondre (timeout). " +
                     "La playlist est peut-être très volumineuse ou le serveur est lent. Réessayez."
             )
         } catch (e: UnknownHostException) {
+            // Serveur injoignable / DNS : réessayer immédiatement ne change rien non plus.
             throw PlaylistLoadException(
                 "Impossible de joindre le serveur. Vérifiez le lien saisi et votre connexion internet."
             )
         } catch (e: PlaylistLoadException) {
             throw e
         } catch (e: IOException) {
-            throw PlaylistLoadException(
-                "Erreur réseau pendant le chargement : ${e.message ?: "connexion interrompue"}."
-            )
+            // Coupure générique en plein téléchargement (ex: "unexpected end of stream") :
+            // souvent transitoire côté panel IPTV, celle-ci vaut le coup d'être retentée.
+            throw TransientNetworkException(e.message ?: "connexion interrompue")
         } finally {
             connection.disconnect()
         }
