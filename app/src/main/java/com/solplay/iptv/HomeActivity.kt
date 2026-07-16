@@ -70,8 +70,12 @@ class HomeActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                val parsed = withContext(Dispatchers.IO) { M3uParser.fetchAndParse(playlist.buildUrl()) }
-                val channels = XtreamApiClient.enrichChannelsWithCategories(playlist, parsed)
+                val channels = if (playlist.extractXtreamCredentials() != null) {
+                    XtreamApiClient.fetchAllChannelsDirect(playlist).channels
+                } else {
+                    val parsed = withContext(Dispatchers.IO) { M3uParser.fetchAndParse(playlist.buildUrl()) }
+                    XtreamApiClient.enrichChannelsWithCategories(playlist, parsed)
+                }
                 if (channels.isNotEmpty()) {
                     ChannelRepository.setChannels(channels)
                     ChannelCacheStore.save(this@HomeActivity, playlist.id, channels)

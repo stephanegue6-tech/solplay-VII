@@ -130,6 +130,221 @@ object XtreamApiClient {
         return withoutExtension.toIntOrNull() ?: -1
     }
 
+    // ------------------------------------------------------------------
+    // Chargement DIRECT via l'API JSON (sans jamais télécharger le M3U).
+    //
+    // Certains panels bloquent ou limitent volontairement le téléchargement
+    // du fichier M3U complet (get.php) - souvent pour limiter le partage de
+    // comptes - alors que l'API JSON native (player_api.php), utilisée par
+    // les vrais lecteurs Xtream (TiviMate, IPTV Smarters...), continue de
+    // fonctionner normalement. Ces fonctions reconstruisent directement les
+    // chaînes/films depuis cette API, sans jamais passer par le M3U.
+    //
+    // Les Séries sont chargées en 2 temps, comme le font ces mêmes apps :
+    // d'abord la liste des séries (légère), puis les épisodes d'UNE série
+    // seulement au moment où l'utilisateur l'ouvre (fetchSeriesEpisodes) -
+    // il serait bien trop long de récupérer les épisodes de toutes les
+    // séries d'un coup (un appel réseau par série).
+    // ------------------------------------------------------------------
+
+    data class DirectLoadResult(val channels: List<Channel>, val liveCount: Int, val vodCount: Int, val seriesCount: Int)
+
+    /** Charge Live + Films + liste des séries (sans épisodes) en parallèle, sans jamais toucher au M3U. */
+    suspend fun fetchAllChannelsDirect(playlist: SavedPlaylist): DirectLoadResult = coroutineScope {
+        val liveDeferred = async { fetchLiveChannelsDirect(playlist) }
+        val vodDeferred = async { fetchVodChannelsDirect(playlist) }
+        val seriesDeferred = async { fetchSeriesShellChannels(playlist) }
+
+        val live = liveDeferred.await()
+        val vod = vodDeferred.await()
+        val series = seriesDeferred.await()
+
+        DirectLoadResult(live + vod + series, live.size, vod.size, series.size)
+    }
+
+    private fun fetchJsonObject(url: String): JSONObject? {
+        val request = Request.Builder().url(url).get().build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                Log.w(TAG, "HTTP ${response.code} pour $url")
+                return null
+            }
+            val body = response.body?.string().orEmpty()
+            return try {
+                JSONObject(body)
+            } catch (e: Exception) {
+                Log.w(TAG, "Réponse JSON inattendue pour $url : ${e.message}")
+                null
+            }
+        }
+    }
+
+    suspend fun fetchLiveChannelsDirect(playlist: SavedPlaylist): List<Channel> = withContext(Dispatchers.IO) {
+        try {
+            val (base, user, pass) = playlist.extractXtreamCredentials() ?: return@withContext emptyList()
+
+            val categoriesDeferred = async { fetchJsonArray("$base/player_api.php?username=$user&password=$pass&action=get_live_categories") }
+            val streamsDeferred = async { fetchJsonArray("$base/player_api.php?username=$user&password=$pass&action=get_live_streams") }
+            val categories = categoriesDeferred.await() ?: JSONArray()
+            val streams = streamsDeferred.await() ?: return@withContext emptyList()
+
+            val categoryNames = mutableMapOf<String, String>()
+            for (i in 0 until categories.length()) {
+                val c = categories.optJSONObject(i) ?: continue
+                val id = c.optString("category_id")
+                val name = c.optString("category_name")
+                if (id.isNotEmpty() && name.isNotEmpty()) categoryNames[id] = name
+            }
+
+            (0 until streams.length()).mapNotNull { i ->
+                val s = streams.optJSONObject(i) ?: return@mapNotNull null
+                val streamId = s.optInt("stream_id", -1)
+                if (streamId <= 0) return@mapNotNull null
+                val name = s.optString("name").ifBlank { "Chaîne $streamId" }
+                val logo = s.optString("stream_icon").takeIf { it.isNotBlank() }
+                val group = categoryNames[s.optString("category_id")]
+                Channel(
+                    name = name,
+                    logoUrl = logo,
+                    groupTitle = group,
+                    streamUrl = "$base/live/$user/$pass/$streamId.ts"
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Échec chargement direct Live : ${e.message}")
+            emptyList()
+        }
+    }
+
+    suspend fun fetchVodChannelsDirect(playlist: SavedPlaylist): List<Channel> = withContext(Dispatchers.IO) {
+        try {
+            val (base, user, pass) = playlist.extractXtreamCredentials() ?: return@withContext emptyList()
+
+            val categoriesDeferred = async { fetchJsonArray("$base/player_api.php?username=$user&password=$pass&action=get_vod_categories") }
+            val streamsDeferred = async { fetchJsonArray("$base/player_api.php?username=$user&password=$pass&action=get_vod_streams") }
+            val categories = categoriesDeferred.await() ?: JSONArray()
+            val streams = streamsDeferred.await() ?: return@withContext emptyList()
+
+            val categoryNames = mutableMapOf<String, String>()
+            for (i in 0 until categories.length()) {
+                val c = categories.optJSONObject(i) ?: continue
+                val id = c.optString("category_id")
+                val name = c.optString("category_name")
+                if (id.isNotEmpty() && name.isNotEmpty()) categoryNames[id] = name
+            }
+
+            (0 until streams.length()).mapNotNull { i ->
+                val s = streams.optJSONObject(i) ?: return@mapNotNull null
+                val streamId = s.optInt("stream_id", -1)
+                if (streamId <= 0) return@mapNotNull null
+                val name = s.optString("name").ifBlank { "Film $streamId" }
+                val logo = s.optString("stream_icon").takeIf { it.isNotBlank() }
+                val group = categoryNames[s.optString("category_id")]
+                val ext = s.optString("container_extension").ifBlank { "mp4" }
+                Channel(
+                    name = name,
+                    logoUrl = logo,
+                    groupTitle = group,
+                    streamUrl = "$base/movie/$user/$pass/$streamId.$ext"
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Échec chargement direct VOD : ${e.message}")
+            emptyList()
+        }
+    }
+
+    /**
+     * Liste des séries SANS leurs épisodes (appel léger). Chaque entrée est une
+     * "coquille" reconnaissable à son streamUrl sans extension de fichier
+     * (".../series/user/pass/123" au lieu de "...123.mkv") : voir
+     * [ChannelsActivity.openPlayer] qui détecte ce cas pour charger les
+     * épisodes réels via [fetchSeriesEpisodes] au moment où l'utilisateur
+     * ouvre cette série, plutôt que de tout charger d'un coup.
+     */
+    suspend fun fetchSeriesShellChannels(playlist: SavedPlaylist): List<Channel> = withContext(Dispatchers.IO) {
+        try {
+            val (base, user, pass) = playlist.extractXtreamCredentials() ?: return@withContext emptyList()
+
+            val categoriesDeferred = async { fetchJsonArray("$base/player_api.php?username=$user&password=$pass&action=get_series_categories") }
+            val seriesDeferred = async { fetchJsonArray("$base/player_api.php?username=$user&password=$pass&action=get_series") }
+            val categories = categoriesDeferred.await() ?: JSONArray()
+            val seriesList = seriesDeferred.await() ?: return@withContext emptyList()
+
+            val categoryNames = mutableMapOf<String, String>()
+            for (i in 0 until categories.length()) {
+                val c = categories.optJSONObject(i) ?: continue
+                val id = c.optString("category_id")
+                val name = c.optString("category_name")
+                if (id.isNotEmpty() && name.isNotEmpty()) categoryNames[id] = name
+            }
+
+            (0 until seriesList.length()).mapNotNull { i ->
+                val s = seriesList.optJSONObject(i) ?: return@mapNotNull null
+                val seriesId = s.optInt("series_id", -1)
+                if (seriesId <= 0) return@mapNotNull null
+                val name = s.optString("name").ifBlank { "Série $seriesId" }
+                val logo = s.optString("cover").takeIf { it.isNotBlank() }
+                val group = categoryNames[s.optString("category_id")]
+                Channel(
+                    name = name,
+                    logoUrl = logo,
+                    groupTitle = group,
+                    streamUrl = "$base/series/$user/$pass/$seriesId" // pas d'extension = coquille (voir doc ci-dessus)
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Échec chargement direct Séries : ${e.message}")
+            emptyList()
+        }
+    }
+
+    /** Une chaîne "coquille" créée par [fetchSeriesShellChannels] a un streamUrl sans extension de fichier. */
+    fun isSeriesShell(channel: Channel): Boolean =
+        channel.contentType() == ContentType.SERIES && !channel.streamUrl.substringAfterLast('/').contains('.')
+
+    /**
+     * Récupère les épisodes réels d'UNE série (saisons + épisodes), au moment
+     * où l'utilisateur l'ouvre. Chaque épisode devient un [Channel] directement
+     * lisible, dans l'ordre saison/épisode.
+     */
+    suspend fun fetchSeriesEpisodes(playlist: SavedPlaylist, seriesChannel: Channel): List<Channel> = withContext(Dispatchers.IO) {
+        try {
+            val (base, user, pass) = playlist.extractXtreamCredentials() ?: return@withContext emptyList()
+            val seriesId = extractStreamId(seriesChannel.streamUrl)
+            if (seriesId <= 0) return@withContext emptyList()
+
+            val info = fetchJsonObject("$base/player_api.php?username=$user&password=$pass&action=get_series_info&series_id=$seriesId")
+                ?: return@withContext emptyList()
+            val episodesBySeason = info.optJSONObject("episodes") ?: return@withContext emptyList()
+
+            val result = mutableListOf<Channel>()
+            val seasonKeys = episodesBySeason.keys().asSequence().sortedBy { it.toIntOrNull() ?: 0 }
+            for (seasonKey in seasonKeys) {
+                val episodes = episodesBySeason.optJSONArray(seasonKey) ?: continue
+                for (i in 0 until episodes.length()) {
+                    val ep = episodes.optJSONObject(i) ?: continue
+                    val episodeId = ep.optString("id").toIntOrNull() ?: continue
+                    val epNum = ep.optString("episode_num").ifBlank { "?" }
+                    val title = ep.optString("title").ifBlank { "Épisode $epNum" }
+                    val ext = ep.optString("container_extension").ifBlank { "mp4" }
+                    result.add(
+                        Channel(
+                            name = "S$seasonKey · E$epNum - $title",
+                            logoUrl = seriesChannel.logoUrl,
+                            groupTitle = seriesChannel.groupTitle,
+                            streamUrl = "$base/series/$user/$pass/$episodeId.$ext"
+                        )
+                    )
+                }
+            }
+            result
+        } catch (e: Exception) {
+            Log.w(TAG, "Échec récupération épisodes série : ${e.message}")
+            emptyList()
+        }
+    }
+
     /**
      * Complète le group-title (catégorie) des chaînes quand le M3U du panel
      * Xtream ne le fournit pas, en s'appuyant sur l'API JSON native du panel

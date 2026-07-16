@@ -187,11 +187,48 @@ class ChannelsActivity : AppCompatActivity() {
     }
 
     private fun openPlayer(channel: Channel) {
+        // Une "coquille" de série (chargement direct JSON, voir XtreamApiClient) ne
+        // contient pas encore d'épisodes lisibles : on les récupère à la demande, au
+        // moment où l'utilisateur ouvre cette série précise (plutôt que de charger
+        // les épisodes de toutes les séries d'un coup, bien trop long).
+        if (XtreamApiClient.isSeriesShell(channel)) {
+            openSeriesEpisodes(channel)
+            return
+        }
         ChannelRepository.setPlayingList(channelsForCurrentType())
         val intent = Intent(this, PlayerActivity::class.java)
         intent.putExtra(PlayerActivity.EXTRA_STREAM_URL, channel.streamUrl)
         intent.putExtra(PlayerActivity.EXTRA_STREAM_NAME, channel.name)
         startActivity(intent)
+    }
+
+    private fun openSeriesEpisodes(seriesChannel: Channel) {
+        val activePlaylist = PlaylistStore.getActiveId(this)
+            ?.let { id -> PlaylistStore.getAll(this).firstOrNull { it.id == id } } ?: return
+
+        val progress = android.app.ProgressDialog.show(this, null, "Chargement des épisodes…", true, false)
+        lifecycleScope.launch {
+            val episodes = XtreamApiClient.fetchSeriesEpisodes(activePlaylist, seriesChannel)
+            progress.dismiss()
+            if (isFinishing) return@launch
+            if (episodes.isEmpty()) {
+                android.widget.Toast.makeText(this@ChannelsActivity, "Aucun épisode trouvé pour cette série.", android.widget.Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val labels = episodes.map { it.name }.toTypedArray()
+            AlertDialog.Builder(this@ChannelsActivity)
+                .setTitle(seriesChannel.name)
+                .setItems(labels) { _, index ->
+                    val episode = episodes[index]
+                    ChannelRepository.setPlayingList(episodes)
+                    val intent = Intent(this@ChannelsActivity, PlayerActivity::class.java)
+                    intent.putExtra(PlayerActivity.EXTRA_STREAM_URL, episode.streamUrl)
+                    intent.putExtra(PlayerActivity.EXTRA_STREAM_NAME, episode.name)
+                    startActivity(intent)
+                }
+                .setNegativeButton("Fermer", null)
+                .show()
+        }
     }
 
     private fun setupTabs() {

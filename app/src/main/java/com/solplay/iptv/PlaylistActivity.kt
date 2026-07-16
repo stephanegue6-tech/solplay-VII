@@ -203,16 +203,29 @@ class PlaylistActivity : AppCompatActivity() {
             "Connexion au serveur…\nCela peut prendre du temps sur les grosses playlists, merci de patienter."
         lifecycleScope.launch {
             try {
-                val parsed = withContext(Dispatchers.IO) {
-                    M3uParser.fetchAndParse(playlist.buildUrl()) { attempt, maxAttempts ->
-                        runOnUiThread {
-                            binding.tvLoadingStatus.text =
-                                "Connexion interrompue, nouvelle tentative ($attempt/$maxAttempts)…"
+                // Dès que des identifiants Xtream sont disponibles (mode Xtream Codes
+                // saisi directement, ou détectés dans un lien M3U déguisé), on charge
+                // directement via l'API JSON du panel plutôt que le fichier M3U complet :
+                // plus rapide, et certains panels bloquent/limitent justement le
+                // téléchargement M3U en masse sans bloquer l'API JSON classique.
+                val channels = if (playlist.extractXtreamCredentials() != null) {
+                    binding.tvLoadingStatus.text = "Connexion à l'API du panel…"
+                    val result = withContext(Dispatchers.IO) { XtreamApiClient.fetchAllChannelsDirect(playlist) }
+                    binding.tvLoadingStatus.text =
+                        "${result.liveCount} chaînes, ${result.vodCount} films, ${result.seriesCount} séries trouvés…"
+                    result.channels
+                } else {
+                    val parsed = withContext(Dispatchers.IO) {
+                        M3uParser.fetchAndParse(playlist.buildUrl()) { attempt, maxAttempts ->
+                            runOnUiThread {
+                                binding.tvLoadingStatus.text =
+                                    "Connexion interrompue, nouvelle tentative ($attempt/$maxAttempts)…"
+                            }
                         }
                     }
+                    binding.tvLoadingStatus.text = "${parsed.size} chaînes trouvées, classement en catégories…"
+                    XtreamApiClient.enrichChannelsWithCategories(playlist, parsed)
                 }
-                binding.tvLoadingStatus.text = "${parsed.size} chaînes trouvées, classement en catégories…"
-                val channels = XtreamApiClient.enrichChannelsWithCategories(playlist, parsed)
                 binding.progressBar.visibility = android.view.View.GONE
                 binding.tvLoadingStatus.visibility = android.view.View.GONE
                 binding.btnLoadPlaylist.isEnabled = true
