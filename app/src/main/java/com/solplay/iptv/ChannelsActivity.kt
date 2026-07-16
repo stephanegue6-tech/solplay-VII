@@ -158,14 +158,16 @@ class ChannelsActivity : AppCompatActivity() {
     /**
      * Ouvre la grille EPG multi-chaînes pour les chaînes Live actuellement
      * affichées (bouquet + recherche en cours). La grille s'appuie sur l'API
-     * Xtream (`get_short_epg`) : elle n'est donc proposée que pour une
-     * playlist ajoutée/détectée en mode Xtream (voir SavedPlaylist).
+     * Xtream (`get_short_epg`) : elle nécessite donc des identifiants Xtream
+     * (serveur/user/password), qu'ils aient été saisis directement en mode
+     * "Xtream Codes", ou détectés automatiquement dans un lien M3U qui est
+     * en réalité un lien Xtream déguisé (voir SavedPlaylist.extractXtreamCredentials).
      */
     private fun openEpgGrid() {
         val activePlaylist = PlaylistStore.getActiveId(this)
             ?.let { id -> PlaylistStore.getAll(this).firstOrNull { it.id == id } }
 
-        if (activePlaylist == null || activePlaylist.mode != PlaylistMode.XTREAM) {
+        if (activePlaylist == null || activePlaylist.extractXtreamCredentials() == null) {
             android.widget.Toast.makeText(
                 this,
                 "La grille EPG nécessite une playlist Xtream Codes (le programme n'est pas fourni par un simple lien M3U générique).",

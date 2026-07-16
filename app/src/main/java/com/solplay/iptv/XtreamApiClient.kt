@@ -188,11 +188,8 @@ object XtreamApiClient {
      * EPG côté fournisseur), en cas d'erreur réseau, ou hors mode Xtream.
      */
     suspend fun fetchNowPlaying(playlist: SavedPlaylist, streamId: Int): EpgProgram? {
-        if (playlist.mode != PlaylistMode.XTREAM || streamId <= 0) return null
-        val base = playlist.xtreamServer.trim().trimEnd('/')
-        val user = playlist.xtreamUsername.trim()
-        val pass = playlist.xtreamPassword.trim()
-        if (base.isEmpty() || user.isEmpty() || pass.isEmpty()) return null
+        if (streamId <= 0) return null
+        val (base, user, pass) = playlist.extractXtreamCredentials() ?: return null
 
         val cacheKey = "$base|$user|$streamId"
         if (epgCache.containsKey(cacheKey)) return epgCache[cacheKey]
@@ -252,11 +249,8 @@ object XtreamApiClient {
      * chaîne, en cas d'erreur réseau, ou hors mode Xtream.
      */
     suspend fun fetchProgramGuide(playlist: SavedPlaylist, streamId: Int, limit: Int = 20): List<EpgProgram> {
-        if (playlist.mode != PlaylistMode.XTREAM || streamId <= 0) return emptyList()
-        val base = playlist.xtreamServer.trim().trimEnd('/')
-        val user = playlist.xtreamUsername.trim()
-        val pass = playlist.xtreamPassword.trim()
-        if (base.isEmpty() || user.isEmpty() || pass.isEmpty()) return emptyList()
+        if (streamId <= 0) return emptyList()
+        val (base, user, pass) = playlist.extractXtreamCredentials() ?: return emptyList()
 
         val cacheKey = "$base|$user|$streamId|$limit"
         guideCache[cacheKey]?.let { return it }
@@ -308,11 +302,8 @@ object XtreamApiClient {
      * formaté, insuffisant ici (on a besoin de savoir *quel jour* aussi).
      */
     suspend fun fetchProgramSlotsRaw(playlist: SavedPlaylist, streamId: Int, limit: Int = 30): List<EpgSlotRaw> {
-        if (playlist.mode != PlaylistMode.XTREAM || streamId <= 0) return emptyList()
-        val base = playlist.xtreamServer.trim().trimEnd('/')
-        val user = playlist.xtreamUsername.trim()
-        val pass = playlist.xtreamPassword.trim()
-        if (base.isEmpty() || user.isEmpty() || pass.isEmpty()) return emptyList()
+        if (streamId <= 0) return emptyList()
+        val (base, user, pass) = playlist.extractXtreamCredentials() ?: return emptyList()
 
         val cacheKey = "$base|$user|$streamId|slots|$limit"
         slotsCache[cacheKey]?.let { return it }

@@ -24,13 +24,37 @@ object M3uParser {
      * Le parsing se fait en streaming (ligne par ligne) pendant le téléchargement,
      * sans jamais charger tout le fichier en mémoire d'un coup : plus rapide et
      * plus léger pour les grosses playlists (10 000+ chaînes).
+     *
+     * Réessaie automatiquement en cas de coupure réseau transitoire (ex: "unexpected
+     * end of stream"), fréquente avec certains panels IPTV qui ferment la connexion
+     * prématurément. On ne remonte l'erreur à l'utilisateur qu'après plusieurs échecs.
      */
     fun fetchAndParse(playlistUrl: String): List<Channel> {
+        val maxAttempts = 3
+        var lastError: PlaylistLoadException? = null
+
+        for (attempt in 1..maxAttempts) {
+            try {
+                return fetchAndParseOnce(playlistUrl)
+            } catch (e: PlaylistLoadException) {
+                lastError = e
+                if (attempt < maxAttempts) {
+                    Thread.sleep(800L * attempt) // petite pause avant de réessayer
+                }
+            }
+        }
+        throw lastError ?: PlaylistLoadException("Erreur réseau inconnue pendant le chargement.")
+    }
+
+    private fun fetchAndParseOnce(playlistUrl: String): List<Channel> {
         val connection = URL(playlistUrl).openConnection() as HttpURLConnection
         connection.connectTimeout = 20000   // 20s pour établir la connexion
         connection.readTimeout = 120000     // 120s pour le téléchargement/lecture
         connection.requestMethod = "GET"
         connection.instanceFollowRedirects = true
+        // Empêche la réutilisation d'une connexion Keep-Alive potentiellement déjà
+        // fermée côté serveur : cause fréquente de "unexpected end of stream" sur Android.
+        connection.setRequestProperty("Connection", "close")
         connection.setRequestProperty(
             "User-Agent",
             "Mozilla/5.0 (Linux; Android 10; SM-A205U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36"
