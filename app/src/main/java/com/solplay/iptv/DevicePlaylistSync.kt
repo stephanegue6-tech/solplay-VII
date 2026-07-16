@@ -99,6 +99,8 @@ object DevicePlaylistSync {
         } catch (e: Exception) {
             // Silencieux : pas grave si hors-ligne, on retentera à la prochaine ouverture de l'écran.
         }
+    }
+
     /**
      * Vérifie qu'une assignation "device:{remoteId}" est TOUJOURS active côté
      * Firebase, sans réécrire tout le stockage local (contrairement à [sync]).
