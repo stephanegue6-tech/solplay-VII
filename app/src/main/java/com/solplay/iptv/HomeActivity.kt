@@ -23,6 +23,18 @@ class HomeActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityHomeBinding
 
+    override fun onResume() {
+        super.onResume()
+        // Si la playlist active a été supprimée pendant que cet écran était en
+        // arrière-plan (ex: retour depuis "Mes playlists" après suppression),
+        // on ne doit plus rien afficher ici : retour à l'écran de chargement.
+        if (PlaylistStore.getActiveId(this) == null) {
+            ChannelRepository.clear()
+            startActivity(Intent(this, PlaylistActivity::class.java))
+            finish()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityHomeBinding.inflate(layoutInflater)

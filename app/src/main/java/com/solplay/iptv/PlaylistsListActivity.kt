@@ -208,6 +208,7 @@ class PlaylistsListActivity : AppCompatActivity() {
             .setPositiveButton("Supprimer") { _, _ ->
                 PlaylistStore.delete(this, playlist.id)
                 ChannelCacheStore.clear(this)
+                ChannelRepository.clear()
                 refresh()
             }
             .setNegativeButton("Annuler", null)

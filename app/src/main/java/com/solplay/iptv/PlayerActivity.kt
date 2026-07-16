@@ -87,7 +87,8 @@ class PlayerActivity : AppCompatActivity() {
 
     /**
      * Tant que le lecteur est ouvert, revérifie périodiquement (toutes les
-     * 2 minutes) que la playlist assignée par l'admin est toujours active.
+     * 20 secondes, plus une fois immédiatement au lancement) que la playlist
+     * assignée par l'admin est toujours active.
      * Sans ça, une suppression d'assignation pendant que l'utilisateur
      * regarde déjà une chaîne n'avait AUCUN effet avant la fin de la
      * session : PlaylistStore.getActiveId()/getAll() ne sont lus qu'une
@@ -107,7 +108,6 @@ class PlayerActivity : AppCompatActivity() {
 
         assignmentWatcherJob = lifecycleScope.launch {
             while (true) {
-                kotlinx.coroutines.delay(2 * 60 * 1000L)
                 val stillValid = DevicePlaylistSync.checkStillAssigned(this@PlayerActivity, tag)
                 if (!stillValid) {
                     Toast.makeText(
@@ -119,6 +119,7 @@ class PlayerActivity : AppCompatActivity() {
                     finish()
                     break
                 }
+                kotlinx.coroutines.delay(20_000L)
             }
         }
     }
