@@ -64,11 +64,11 @@ class HomeActivity : AppCompatActivity() {
      * connexion à chaque lancement.
      */
     private fun refreshCacheInBackgroundIfStale() {
-        val activeId = PlaylistStore.getActiveId(this) ?: return
-        val playlist = PlaylistStore.getAll(this).firstOrNull { it.id == activeId } ?: return
-        if (ChannelCacheStore.ageMillis(this, playlist.id) < CACHE_REFRESH_THRESHOLD_MS) return
-
         lifecycleScope.launch {
+            val activeId = PlaylistStore.getActiveId(this@HomeActivity) ?: return@launch
+            val playlist = PlaylistStore.getAll(this@HomeActivity).firstOrNull { it.id == activeId } ?: return@launch
+            if (ChannelCacheStore.ageMillis(this@HomeActivity, playlist.id) < CACHE_REFRESH_THRESHOLD_MS) return@launch
+
             try {
                 val channels = if (playlist.extractXtreamCredentials() != null) {
                     XtreamApiClient.fetchAllChannelsDirect(playlist).channels

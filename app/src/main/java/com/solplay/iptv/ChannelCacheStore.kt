@@ -1,6 +1,8 @@
 package com.solplay.iptv
 
 import android.content.Context
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -16,12 +18,23 @@ import java.io.File
  * sur les grosses playlists (10 000+ chaînes). Avec ce cache, l'app peut
  * rouvrir directement sur l'accueil avec les chaînes déjà connues, puis se
  * rafraîchir en arrière-plan sans bloquer l'utilisateur (voir HomeActivity).
+ *
+ * IMPORTANT (perf) : save/load/ageMillis sont volontairement des fonctions
+ * `suspend` qui basculent elles-mêmes sur Dispatchers.IO. Sur une grosse
+ * playlist Xtream (Live+VOD+Séries confondus, souvent 10 000 à 50 000
+ * entrées), lire/écrire ce JSON prend plusieurs centaines de ms à plusieurs
+ * secondes - largement de quoi geler l'UI, voire déclencher un ANR, si
+ * jamais appelé depuis le thread principal (ça a été le cas avant : appel
+ * direct dans SplashActivity, et via lifecycleScope.launch { } - qui tourne
+ * sur Main par défaut - dans PlaylistActivity/PlaylistsListActivity/
+ * HomeActivity). En étant `suspend` + Dispatchers.IO ici, plus moyen d'oublier
+ * de le faire à un futur appel.
  */
 object ChannelCacheStore {
 
     private const val FILE_NAME = "channel_cache.json"
 
-    fun save(context: Context, playlistId: String, channels: List<Channel>) {
+    suspend fun save(context: Context, playlistId: String, channels: List<Channel>) = withContext(Dispatchers.IO) {
         try {
             val array = JSONArray()
             for (c in channels) {
@@ -43,12 +56,12 @@ object ChannelCacheStore {
     }
 
     /** Renvoie les chaînes en cache pour cette playlist, ou null si absent/périmé/corrompu. */
-    fun load(context: Context, playlistId: String): List<Channel>? {
-        return try {
+    suspend fun load(context: Context, playlistId: String): List<Channel>? = withContext(Dispatchers.IO) {
+        try {
             val file = File(context.filesDir, FILE_NAME)
-            if (!file.exists()) return null
+            if (!file.exists()) return@withContext null
             val root = JSONObject(file.readText())
-            if (root.optString("playlistId") != playlistId) return null
+            if (root.optString("playlistId") != playlistId) return@withContext null
 
             val array = root.getJSONArray("channels")
             val result = ArrayList<Channel>(array.length())
@@ -70,12 +83,12 @@ object ChannelCacheStore {
     }
 
     /** Ancienneté du cache pour cette playlist, en millisecondes (Long.MAX_VALUE si absent). */
-    fun ageMillis(context: Context, playlistId: String): Long {
-        return try {
+    suspend fun ageMillis(context: Context, playlistId: String): Long = withContext(Dispatchers.IO) {
+        try {
             val file = File(context.filesDir, FILE_NAME)
-            if (!file.exists()) return Long.MAX_VALUE
+            if (!file.exists()) return@withContext Long.MAX_VALUE
             val root = JSONObject(file.readText())
-            if (root.optString("playlistId") != playlistId) return Long.MAX_VALUE
+            if (root.optString("playlistId") != playlistId) return@withContext Long.MAX_VALUE
             System.currentTimeMillis() - root.optLong("savedAt", 0)
         } catch (e: Exception) {
             Long.MAX_VALUE

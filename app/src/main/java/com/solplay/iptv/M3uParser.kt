@@ -22,6 +22,13 @@ private class TransientNetworkException(message: String) : Exception(message)
 
 object M3uParser {
 
+    // Précompilées une seule fois (au lieu de `Regex(...)` recréé à CHAQUE ligne
+    // #EXTINF dans parseStream) : sur une playlist de 50 000+ lignes, recompiler
+    // le pattern à chaque itération ajoute un surcoût CPU inutile.
+    private val LOGO_REGEX = Regex("tvg-logo=\"([^\"]*)\"")
+    private val GROUP_REGEX = Regex("group-title=\"([^\"]*)\"")
+
+
     /**
      * Télécharge et parse une playlist M3U depuis une URL distante.
      * Le parsing se fait en streaming (ligne par ligne) pendant le téléchargement,
@@ -122,8 +129,8 @@ object M3uParser {
             when {
                 line.startsWith("#EXTINF", ignoreCase = true) -> {
                     currentName = line.substringAfterLast(",").trim().ifEmpty { "Chaîne inconnue" }
-                    currentLogo = Regex("tvg-logo=\"([^\"]*)\"").find(line)?.groupValues?.get(1)
-                    currentGroup = Regex("group-title=\"([^\"]*)\"").find(line)?.groupValues?.get(1)
+                    currentLogo = LOGO_REGEX.find(line)?.groupValues?.get(1)
+                    currentGroup = GROUP_REGEX.find(line)?.groupValues?.get(1)
                 }
                 line.isNotEmpty() && !line.startsWith("#") -> {
                     channels.add(Channel(currentName, currentLogo, currentGroup, line))

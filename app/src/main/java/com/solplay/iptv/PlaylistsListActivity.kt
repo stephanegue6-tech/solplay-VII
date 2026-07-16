@@ -42,18 +42,39 @@ class PlaylistsListActivity : AppCompatActivity() {
     super.onResume()
     refresh()
     // Vérifie si l'admin a assigné une playlist à la clé de cet appareil
-    // depuis le panneau admin, et l'ajoute automatiquement si oui.
+    // depuis le panneau admin, et l'ajoute automatiquement si oui - puis s'y
+    // connecte automatiquement (silencieusement, sans Toast) si ce n'est pas
+    // déjà la playlist active. Ainsi, même un utilisateur qui ne sait pas/ne
+    // peut pas se connecter lui-même se retrouve connecté simplement en
+    // rouvrant l'app - l'admin gère tout depuis son espace.
     lifecycleScope.launch {
         DevicePlaylistSync.sync(this@PlaylistsListActivity)
         refresh()
+
+        val activeId = PlaylistStore.getActiveId(this@PlaylistsListActivity)
+        val deviceAssigned = PlaylistStore.getAll(this@PlaylistsListActivity)
+            .filter { it.fromCode?.startsWith("device:") == true }
+
+        // Un seul compte assigné par l'admin, pas encore actif sur cet
+        // appareil (nouvelle assignation, ou admin a changé les identifiants
+        // depuis son espace) : connexion automatique silencieuse.
+        if (deviceAssigned.size == 1 && deviceAssigned.first().id != activeId) {
+            connect(deviceAssigned.first(), silent = true)
+        }
     }
 }
 
 
     /**
      * Force une resynchronisation immédiate avec les codes/comptes assignés par
-     * l'admin (Firebase "device_playlists"), sans avoir à ouvrir "Modifier".
-     * Utile juste après que l'admin a assigné ou changé un code M3U/Xtream.
+     * l'admin (Firebase "device_playlists"), ET se reconnecte automatiquement
+     * à la playlist assignée (retélécharge ses chaînes, l'active, ouvre
+     * l'accueil) - sans que l'utilisateur ait besoin de savoir/pouvoir aller
+     * dans "Modifier" pour relancer la connexion lui-même. C'est ce qui permet
+     * à l'admin de "connecter" un client à distance depuis son espace : il
+     * assigne/modifie la playlist côté admin, le client n'a plus qu'à appuyer
+     * sur ce seul bouton (ou même automatiquement au prochain lancement, voir
+     * onResume) pour que tout se fasse tout seul.
      */
     private fun refreshAccounts() {
         binding.btnRefreshAccounts.isEnabled = false
@@ -62,11 +83,42 @@ class PlaylistsListActivity : AppCompatActivity() {
             try {
                 DevicePlaylistSync.sync(this@PlaylistsListActivity)
                 refresh()
-                Toast.makeText(
-                    this@PlaylistsListActivity,
-                    "Comptes actualisés.",
-                    Toast.LENGTH_SHORT
-                ).show()
+
+                // Playlist(s) assignée(s) directement par l'admin (par opposition
+                // à celles ajoutées manuellement ou via un code saisi par le
+                // client) : c'est celle(s) qu'on reconnecte automatiquement.
+                val deviceAssigned = PlaylistStore.getAll(this@PlaylistsListActivity)
+                    .filter { it.fromCode?.startsWith("device:") == true }
+
+                when {
+                    deviceAssigned.isEmpty() -> {
+                        Toast.makeText(
+                            this@PlaylistsListActivity,
+                            "Comptes actualisés.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    deviceAssigned.size == 1 -> {
+                        // Cas normal (un seul compte assigné par l'admin à cet
+                        // appareil) : reconnexion automatique complète, même si
+                        // c'était déjà la playlist active (l'utilisateur a
+                        // appuyé sur "Actualiser" volontairement : on force le
+                        // rechargement, par exemple après que l'admin a changé
+                        // les identifiants d'un compte déjà assigné).
+                        connect(deviceAssigned.first())
+                    }
+                    else -> {
+                        // Plusieurs assignations actives à la fois : cas rare,
+                        // on ne devine pas laquelle activer à la place de
+                        // l'utilisateur - on se contente de les avoir
+                        // synchronisées, l'utilisateur choisit dans la liste.
+                        Toast.makeText(
+                            this@PlaylistsListActivity,
+                            "Comptes actualisés (${deviceAssigned.size} comptes assignés, choisissez lequel connecter).",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
             } catch (e: Exception) {
                 Toast.makeText(
                     this@PlaylistsListActivity,
@@ -75,7 +127,7 @@ class PlaylistsListActivity : AppCompatActivity() {
                 ).show()
             } finally {
                 binding.btnRefreshAccounts.isEnabled = true
-                binding.btnRefreshAccounts.text = "🔄 Actualiser les comptes"
+                binding.btnRefreshAccounts.text = "🔄 Actualiser (connexion automatique)"
             }
         }
     }
@@ -95,9 +147,16 @@ class PlaylistsListActivity : AppCompatActivity() {
         )
     }
 
-    /** Se connecte à une playlist enregistrée : la retélécharge et ouvre l'écran des chaînes. */
-    private fun connect(playlist: SavedPlaylist) {
-        Toast.makeText(this, "Connexion à « ${playlist.name} »…", Toast.LENGTH_SHORT).show()
+    /**
+     * Se connecte à une playlist enregistrée : la retélécharge et ouvre l'écran des chaînes.
+     * [silent] : true quand appelé automatiquement en arrière-plan (onResume) plutôt que
+     * suite à un appui explicite de l'utilisateur - évite d'afficher des Toasts "Connexion…"
+     * intempestifs à chaque simple retour sur cet écran.
+     */
+    private fun connect(playlist: SavedPlaylist, silent: Boolean = false) {
+        if (!silent) {
+            Toast.makeText(this, "Connexion à « ${playlist.name} »…", Toast.LENGTH_SHORT).show()
+        }
         lifecycleScope.launch {
             try {
                 val channels = if (playlist.extractXtreamCredentials() != null) {
@@ -107,11 +166,13 @@ class PlaylistsListActivity : AppCompatActivity() {
                     XtreamApiClient.enrichChannelsWithCategories(playlist, parsed)
                 }
                 if (channels.isEmpty()) {
-                    Toast.makeText(
-                        this@PlaylistsListActivity,
-                        "Aucune chaîne trouvée pour cette playlist.",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    if (!silent) {
+                        Toast.makeText(
+                            this@PlaylistsListActivity,
+                            "Aucune chaîne trouvée pour cette playlist.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                     return@launch
                 }
                 PlaylistStore.setActiveId(this@PlaylistsListActivity, playlist.id)
@@ -119,13 +180,17 @@ class PlaylistsListActivity : AppCompatActivity() {
                 ChannelRepository.setChannels(channels)
                 startActivity(Intent(this@PlaylistsListActivity, HomeActivity::class.java))
             } catch (e: PlaylistLoadException) {
-                Toast.makeText(this@PlaylistsListActivity, e.message, Toast.LENGTH_LONG).show()
+                if (!silent) {
+                    Toast.makeText(this@PlaylistsListActivity, e.message, Toast.LENGTH_LONG).show()
+                }
             } catch (e: Exception) {
-                Toast.makeText(
-                    this@PlaylistsListActivity,
-                    "Erreur de connexion : ${e.message ?: "inconnue"}.",
-                    Toast.LENGTH_LONG
-                ).show()
+                if (!silent) {
+                    Toast.makeText(
+                        this@PlaylistsListActivity,
+                        "Erreur de connexion : ${e.message ?: "inconnue"}.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
         }
     }
