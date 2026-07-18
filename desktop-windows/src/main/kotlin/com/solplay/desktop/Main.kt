@@ -15,6 +15,7 @@ import com.solplay.iptv.TrialManager
 /** Écran actuellement affiché - équivalent desktop de la navigation entre Activities Android. */
 sealed class Screen {
     object Splash : Screen()
+    object VlcMissing : Screen()
     object License : Screen()
     object Connect : Screen()
     data class Home(val playlist: SavedPlaylist) : Screen()
@@ -33,7 +34,18 @@ fun main() = application {
     ) {
         when (val s = screen) {
             is Screen.Splash -> SplashScreen(
-                onDone = {
+                onDone = { vlcAvailable ->
+                    screen = if (!vlcAvailable) {
+                        Screen.VlcMissing
+                    } else if (TrialManager.canAccessApp(ctx)) {
+                        Screen.Connect
+                    } else {
+                        Screen.License
+                    }
+                }
+            )
+            is Screen.VlcMissing -> VlcMissingScreen(
+                onVlcFound = {
                     screen = if (TrialManager.canAccessApp(ctx)) Screen.Connect else Screen.License
                 }
             )

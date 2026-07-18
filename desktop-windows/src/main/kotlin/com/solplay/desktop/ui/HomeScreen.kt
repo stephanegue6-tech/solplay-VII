@@ -6,6 +6,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -16,6 +17,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusTarget
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.unit.dp
 import com.solplay.desktop.core.AsyncImage
 import com.solplay.iptv.Bouquet
@@ -212,7 +221,49 @@ fun HomeScreen(
                 Text("Aucun résultat.", color = MaterialTheme.colorScheme.outline)
             }
         } else {
-            LazyColumn {
+            val listState = rememberLazyListState()
+            val listFocusRequester = remember { FocusRequester() }
+
+            // Focus automatique au premier affichage : sans ça, les flèches
+            // du clavier ne font rien tant que l'utilisateur n'a pas cliqué
+            // manuellement dans la liste au moins une fois (comportement Compose
+            // par défaut : un composant ne reçoit les événements clavier que
+            // s'il a le focus).
+            LaunchedEffect(currentType, currentBouquet) {
+                listFocusRequester.requestFocus()
+            }
+
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .focusRequester(listFocusRequester)
+                    .focusTarget()
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        val index = listState.firstVisibleItemIndex
+                        when (event.key) {
+                            Key.DirectionDown -> {
+                                scope.launch { listState.animateScrollToItem((index + 1).coerceAtMost(filtered.lastIndex)) }
+                                true
+                            }
+                            Key.DirectionUp -> {
+                                scope.launch { listState.animateScrollToItem((index - 1).coerceAtLeast(0)) }
+                                true
+                            }
+                            Key.PageDown -> {
+                                scope.launch { listState.animateScrollToItem((index + 10).coerceAtMost(filtered.lastIndex)) }
+                                true
+                            }
+                            Key.PageUp -> {
+                                scope.launch { listState.animateScrollToItem((index - 10).coerceAtLeast(0)) }
+                                true
+                            }
+                            else -> false
+                        }
+                    }
+            ) {
                 items(filtered, key = { it.streamUrl }) { channel: Channel ->
                     ListItem(
                         leadingContent = {

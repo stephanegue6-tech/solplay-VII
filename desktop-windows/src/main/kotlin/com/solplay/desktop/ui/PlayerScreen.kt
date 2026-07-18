@@ -70,8 +70,24 @@ fun PlayerScreen(
         }
     }
 
-    DisposableEffect(streamUrl) {
+    // IMPORTANT : ne pas appeler .play() dès la composition. SwingPanel
+    // rattache le composant vlcj à la fenêtre native de façon asynchrone
+    // (après la passe de composition Compose) - si .play() est appelé
+    // avant que ce rattachement soit terminé, vlcj lève l'erreur "the
+    // video surface component must be displayable" car il a besoin d'un
+    // handle de fenêtre natif (HWND côté Windows) déjà valide pour
+    // attacher la sortie vidéo. On attend donc que le composant soit
+    // effectivement "displayable" avant de démarrer la lecture.
+    LaunchedEffect(streamUrl) {
+        var attempts = 0
+        while (!mediaPlayerComponent.isDisplayable && attempts < 150) { // ~3s max
+            delay(20L)
+            attempts++
+        }
         mediaPlayerComponent.mediaPlayer().media().play(streamUrl)
+    }
+
+    DisposableEffect(streamUrl) {
         onDispose {
             mediaPlayerComponent.mediaPlayer().controls().stop()
         }

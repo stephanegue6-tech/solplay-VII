@@ -40,7 +40,21 @@ private suspend fun fetchImageBitmap(url: String): ImageBitmap? {
     ImageCache.cache[url]?.let { return it }
     return withContext(Dispatchers.IO) {
         try {
-            val bytes = URI(url).toURL().openStream().use { it.readBytes() }
+            // Comme pour M3uParser.kt : de nombreux CDN de logos IPTV
+            // renvoient une erreur (403/vide) face au User-Agent par défaut
+            // de Java ("Java/17...") et exigent un User-Agent de navigateur.
+            // C'était la cause des logos qui échouaient TOUS systématiquement,
+            // pas juste certains.
+            val connection = URI(url).toURL().openConnection() as java.net.HttpURLConnection
+            connection.connectTimeout = 10000
+            connection.readTimeout = 15000
+            connection.instanceFollowRedirects = true
+            connection.setRequestProperty(
+                "User-Agent",
+                "Mozilla/5.0 (Linux; Android 10; SM-A205U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36"
+            )
+
+            val bytes = connection.inputStream.use { it.readBytes() }
             val bitmap = SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap()
             ImageCache.cache[url] = bitmap
             bitmap
