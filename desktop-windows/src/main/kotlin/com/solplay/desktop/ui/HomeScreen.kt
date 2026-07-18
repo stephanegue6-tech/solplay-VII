@@ -209,16 +209,16 @@ fun HomeScreen(
 
     var showAbout by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
+    Column(Modifier.fillMaxSize().padding(12.dp)) {
         revokedMessage?.let { msg ->
             Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
                 Text(msg, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(12.dp))
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
         }
 
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text(playlist.name, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+            Text(playlist.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             if (currentType == ContentType.LIVE && playlist.extractXtreamCredentials() != null) {
                 TextButton(onClick = {
                     val liveChannels = channelsForType
@@ -238,7 +238,7 @@ fun HomeScreen(
                 onDisconnect()
             }) { Text("Changer de compte") }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
 
         // Petit bandeau permanent (demandé) : clé appareil de ce PC + temps
         // restant sur la licence/l'essai, toujours visible en haut de
@@ -251,13 +251,13 @@ fun HomeScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     "Clé appareil : ${DeviceKeyManager.getDeviceKey(context)}",
                     color = SolPlayColors.White,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(12.dp))
@@ -273,31 +273,39 @@ fun HomeScreen(
                 Text(
                     remainingText,
                     color = SolPlayColors.Orange,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold
                 )
             }
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(6.dp))
 
         if (showAbout) {
             AboutDialog(context = context, onDismiss = { showAbout = false })
         }
 
-        TabRow(selectedTabIndex = currentType.ordinal) {
-            Tab(selected = currentType == ContentType.LIVE, onClick = { currentType = ContentType.LIVE; currentBouquet = ALL_BOUQUETS }, text = { Text("Live") })
-            Tab(selected = currentType == ContentType.MOVIE, onClick = { currentType = ContentType.MOVIE; currentBouquet = ALL_BOUQUETS }, text = { Text("Films") })
-            Tab(selected = currentType == ContentType.SERIES, onClick = { currentType = ContentType.SERIES; currentBouquet = ALL_BOUQUETS }, text = { Text("Séries") })
+        TabRow(selectedTabIndex = currentType.ordinal, modifier = Modifier.height(36.dp)) {
+            Tab(selected = currentType == ContentType.LIVE, onClick = { currentType = ContentType.LIVE; currentBouquet = ALL_BOUQUETS }, text = { Text("Live", style = MaterialTheme.typography.labelMedium) })
+            Tab(selected = currentType == ContentType.MOVIE, onClick = { currentType = ContentType.MOVIE; currentBouquet = ALL_BOUQUETS }, text = { Text("Films", style = MaterialTheme.typography.labelMedium) })
+            Tab(selected = currentType == ContentType.SERIES, onClick = { currentType = ContentType.SERIES; currentBouquet = ALL_BOUQUETS }, text = { Text("Séries", style = MaterialTheme.typography.labelMedium) })
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(6.dp))
 
+        // Recherche compacte : "placeholder" au lieu de "label" flottant -
+        // un label Material3 réserve de la place en plus pour l'animation
+        // (label qui monte au-dessus de la bordure au focus), ce qui rendait
+        // ce champ plus haut que nécessaire pour une simple barre de
+        // recherche. Avec un placeholder, la hauteur redescend à un champ
+        // de recherche classique, sans perdre l'information "Rechercher".
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            label = { Text("Rechercher") },
-            modifier = Modifier.fillMaxWidth()
+            placeholder = { Text("Rechercher...") },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.fillMaxWidth().height(48.dp)
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(8.dp))
 
         // Rangée des bouquets : navigable au clavier (flèches gauche/droite),
         // ce qui n'existait pas du tout avant - seul le clic souris changeait
@@ -350,10 +358,10 @@ fun HomeScreen(
                 )
             }
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(6.dp))
 
-        Text("${filtered.size} élément(s)", style = MaterialTheme.typography.bodySmall)
-        Spacer(Modifier.height(8.dp))
+        Text("${filtered.size} élément(s)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+        Spacer(Modifier.height(4.dp))
 
         if (filtered.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -472,7 +480,7 @@ fun HomeScreen(
                     },
                 contentPadding = PaddingValues(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 gridItems(filtered, key = { it.streamUrl }) { channel: Channel ->
                     Column(
@@ -497,6 +505,7 @@ fun HomeScreen(
                         Text(
                             channel.name,
                             style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
                             maxLines = 2,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )

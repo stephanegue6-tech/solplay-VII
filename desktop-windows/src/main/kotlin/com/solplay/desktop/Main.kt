@@ -17,6 +17,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -172,6 +174,7 @@ fun main() = application {
                 }
         ) {
             SolPlayTheme {
+                Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
                 when (val s = screen) {
                     is Screen.Splash -> SplashScreen(
                         onDone = { vlcAvailable ->
@@ -232,6 +235,7 @@ fun main() = application {
                         playlist = s.playlist,
                         onBack = { goBack() }
                     )
+                }
                 }
             }
         }

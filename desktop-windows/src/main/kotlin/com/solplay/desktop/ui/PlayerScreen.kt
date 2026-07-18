@@ -1,6 +1,12 @@
 package com.solplay.desktop.ui
 
 import android.content.Context
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,11 +29,16 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.solplay.desktop.core.AsyncImage
@@ -36,40 +47,47 @@ import com.solplay.iptv.ChannelRepository
 import com.solplay.iptv.DevicePlaylistSync
 import com.solplay.iptv.PlaylistStore
 import com.solplay.iptv.SavedPlaylist
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.jetbrains.skia.Image as SkiaImage
 import uk.co.caprica.vlcj.player.component.EmbeddedMediaPlayerComponent
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
+import java.io.ByteArrayOutputStream
+import javax.imageio.ImageIO
+
+private const val CONTROLS_HIDE_DELAY_MS = 5000L
 
 /**
  * Lecteur vidéo desktop, remplace ExoPlayer/Media3 (PlayerActivity côté
- * Android) - ExoPlayer est une librairie Android uniquement, indisponible
- * sur JVM desktop. VLC (via vlcj) est utilisé à la place : mêmes formats
- * pris en charge (HLS, TS, MP4...), donc compatible avec exactement les
- * mêmes flux IPTV.
+ * Android). VLC (via vlcj) pilote une installation LOCALE de VLC Media
+ * Player - voir VlcCheck.kt/VlcMissingScreen.kt pour la vérification faite
+ * avant d'arriver ici.
  *
- * PRÉREQUIS IMPORTANT : contrairement à ExoPlayer qui est autonome, vlcj
- * pilote une installation LOCALE de VLC Media Player. L'utilisateur final
- * doit avoir VLC installé sur son PC Windows (gratuit :
- * https://www.videolan.org/vlc/download-windows.html) - sinon cet écran
- * affichera une erreur au lancement de la lecture. C'est la même exigence
- * que la quasi-totalité des lecteurs IPTV desktop basés sur VLC.
+ * IMPORTANT - limite de Compose Desktop qui façonne tout cet écran :
+ * EmbeddedMediaPlayerComponent est un composant "lourd" (natif, fenêtre
+ * système), inséré via SwingPanel. Compose Desktop ne sait PAS empiler du
+ * contenu Compose "léger" par-dessus un composant lourd - tout composant
+ * Compose positionné en superposition (Box.align par-dessus un SwingPanel)
+ * finit invisible, car le composant lourd est toujours peint au-dessus,
+ * quel que soit l'ordre déclaré. C'est ce qui causait le panneau "Changer
+ * de chaîne" invisible et l'écran figé en pause qui ne montrait rien.
  *
- * Revérification pendant la lecture : équivalent du contrôle périodique de
- * PlayerActivity côté Android. Nécessaire séparément de celui de
- * HomeScreen, car cet écran remplace HomeScreen dans la fenêtre pendant la
- * lecture (HomeScreen n'est alors plus composé, donc sa propre boucle est
- * suspendue) - sans ceci, un flux déjà lancé continuerait indéfiniment même
- * après une désactivation par l'admin, tant que l'utilisateur ne revient
- * pas manuellement sur l'écran d'accueil.
- *
- * Panneau "☰ Chaînes" : équivalent du panneau latéral de PlayerActivity
- * côté Android (channelListPanel + etSideSearch + recyclerSideChannels).
- * Utilise ChannelRepository.playingList, déposée par HomeScreen juste avant
- * d'ouvrir cet écran (déjà prévu dans channelRepository.kt mais jamais
- * alimentée côté desktop jusqu'ici) - reste TRANSPARENT/semi-sombre par
- * dessus la vidéo (pas un fond blanc opaque), avec les mêmes couleurs que
- * l'app Android (voir SolPlayColors dans Theme.kt), et une liste navigable
- * aux 4 flèches comme partout ailleurs dans l'app.
+ * Cet écran évite donc TOUTE superposition sur la vidéo :
+ * - Le panneau "Changer de chaîne" n'est plus un calque flottant par-dessus
+ *   la vidéo : c'est un vrai voisin de mise en page (Row), la vidéo
+ *   rétrécit pour lui faire de la place au lieu d'être recouverte.
+ * - En pause, le composant vidéo natif est totalement retiré et remplacé
+ *   par une image Compose classique (capture du dernier finaqe via
+ *   mediaPlayer().snapshots()) - plus de dépendance au rendu natif de VLC
+ *   en pause, qui pouvait afficher un écran noir sur certains flux HLS.
+ * - Les barres haut/bas "auto-hide" ne flottent pas non plus par-dessus la
+ *   vidéo : elles rétrécissent à hauteur 0 (au lieu de disparaître en
+ *   transparence par-dessus), et la vidéo grandit pour occuper l'espace
+ *   libéré. Le résultat visuel est proche (plein écran après 5s
+ *   d'inactivité) sans dépendre d'un empilement non supporté.
  */
 @Composable
 fun PlayerScreen(
@@ -83,22 +101,20 @@ fun PlayerScreen(
 ) {
     val mediaPlayerComponent = remember { EmbeddedMediaPlayerComponent() }
     var revokedMessage by remember { mutableStateOf<String?>(null) }
+    var isPlaying by remember { mutableStateOf(true) }
+    var pausedFrame by remember { mutableStateOf<ImageBitmap?>(null) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(playlist.id) {
         val tag = playlist.fromCode ?: return@LaunchedEffect
         while (true) {
-            // Vérification IMMÉDIATE à chaque tour (pas de delay avant le
-            // premier contrôle) : aligné sur le correctif appliqué côté
-            // Android (PlayerActivity), qui vérifiait auparavant seulement
-            // après 2 minutes, laissant passer sans coupure toute lecture
-            // démarrée juste après une désactivation/suppression admin.
             if (!DevicePlaylistSync.checkStillAssigned(context, tag)) {
                 mediaPlayerComponent.mediaPlayer().controls().stop()
                 PlaylistStore.delete(context, playlist.id)
                 revokedMessage = "L'accès à cette playlist a été retiré par l'administrateur."
                 break
             }
-            delay(30_000L) // même intervalle que PlayerActivity côté Android
+            delay(30_000L)
         }
     }
 
@@ -109,33 +125,39 @@ fun PlayerScreen(
         }
     }
 
-    // IMPORTANT : ne pas appeler .play() dès la composition. SwingPanel
-    // rattache le composant vlcj à la fenêtre native de façon asynchrone
-    // (après la passe de composition Compose) - si .play() est appelé
-    // avant que ce rattachement soit terminé, vlcj lève l'erreur "the
-    // video surface component must be displayable" car il a besoin d'un
-    // handle de fenêtre natif (HWND côté Windows) déjà valide pour
-    // attacher la sortie vidéo. On attend donc que le composant soit
-    // effectivement "displayable" avant de démarrer la lecture.
-    //
-    // setScale(0f) juste après : force VLC à recalculer lui-même le
-    // cadrage/zoom de la vidéo par rapport à la taille RÉELLE du panneau
-    // une fois affiché, au lieu de garder la géométrie calculée au tout
-    // premier instant (souvent 0x0 ou une taille provisoire avant que
-    // SwingPanel ait fini de se dimensionner) - c'est ce qui causait
-    // l'image décalée/rognée en bas d'écran signalée.
-    var isPlaying by remember { mutableStateOf(true) }
+    fun applyAutoFit() {
+        mediaPlayerComponent.mediaPlayer().video().setScale(0f) // 0 = ajustement automatique
+        mediaPlayerComponent.mediaPlayer().video().setAspectRatio(null)
+    }
+
+    // Recalcule le cadrage/zoom à CHAQUE redimensionnement du panneau vidéo,
+    // pas une seule fois au démarrage : un calcul unique restait basé sur la
+    // taille du panneau au moment précis où il a été fait, qui ne
+    // correspond plus à la taille réelle dès que la fenêtre est redimensionnée
+    // ou que les barres haut/bas apparaissent/disparaissent (elles changent
+    // la hauteur disponible pour la vidéo) - c'était la cause de l'image
+    // avec trop d'espace vide en haut et poussée vers le bas.
+    DisposableEffect(Unit) {
+        val listener = object : ComponentAdapter() {
+            override fun componentResized(e: ComponentEvent?) {
+                if (mediaPlayerComponent.isDisplayable) applyAutoFit()
+            }
+        }
+        mediaPlayerComponent.addComponentListener(listener)
+        onDispose { mediaPlayerComponent.removeComponentListener(listener) }
+    }
+
     LaunchedEffect(streamUrl) {
         var attempts = 0
         while (!mediaPlayerComponent.isDisplayable && attempts < 150) { // ~3s max
             delay(20L)
             attempts++
         }
+        pausedFrame = null
         mediaPlayerComponent.mediaPlayer().media().play(streamUrl)
         isPlaying = true
         delay(300L) // laisse VLC ouvrir le flux avant de fixer le cadrage
-        mediaPlayerComponent.mediaPlayer().video().setScale(0f) // 0 = ajustement automatique
-        mediaPlayerComponent.mediaPlayer().video().setAspectRatio(null)
+        applyAutoFit()
     }
 
     DisposableEffect(streamUrl) {
@@ -144,25 +166,78 @@ fun PlayerScreen(
         }
     }
 
+    fun togglePlayPause() {
+        val mp = mediaPlayerComponent.mediaPlayer()
+        if (isPlaying) {
+            // Capture le dernier finage AVANT de mettre en pause, pour
+            // l'afficher en repli à la place du composant vidéo natif -
+            // voir la note en tête de fichier : plus fiable que de compter
+            // sur le rendu natif de VLC en pause (qui pouvait afficher du
+            // noir sur certains flux HLS/live).
+            scope.launch {
+                val snapshot = try {
+                    withContext(Dispatchers.IO) { mp.snapshots().get() }
+                } catch (e: Exception) {
+                    null
+                }
+                pausedFrame = snapshot?.let { bufferedImage ->
+                    try {
+                        val bytes = ByteArrayOutputStream().use { out ->
+                            ImageIO.write(bufferedImage, "png", out)
+                            out.toByteArray()
+                        }
+                        SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap()
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+            }
+            mp.controls().pause()
+        } else {
+            pausedFrame = null
+            mp.controls().play()
+        }
+        isPlaying = !isPlaying
+    }
+
     // Capturée une seule fois à l'entrée sur cet écran (même bouquet/recherche
-    // que ce qui était affiché sur HomeScreen au moment du clic) : ne doit pas
-    // changer pendant qu'on regarde, y compris quand on change de chaîne
-    // depuis ce panneau (onSwitchChannel ne recrée pas cet écran, voir
-    // Main.kt : replaceWith au lieu de navigateTo, pour ne pas empiler le
-    // back-stack à chaque changement de chaîne).
+    // que ce qui était affiché sur HomeScreen au moment du clic).
     val playingList = remember { ChannelRepository.playingList }
 
     var showChannelPanel by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    val scope = rememberCoroutineScope()
+
+    // --- Auto-hide des barres haut/bas après 5s d'inactivité (clavier ou
+    // souris), voir la note en tête de fichier sur pourquoi ce n'est pas un
+    // calque flottant par-dessus la vidéo. Toujours visible pendant la
+    // pause ou quand le panneau "Changer de chaîne" est ouvert.
+    var lastActivity by remember { mutableStateOf(System.currentTimeMillis()) }
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    val controlsVisible = !isPlaying || showChannelPanel || (now - lastActivity < CONTROLS_HIDE_DELAY_MS)
+
+    fun pingActivity() {
+        lastActivity = System.currentTimeMillis()
+    }
+
+    // Coche l'horloge "now" toutes les 300ms, en continu, tant que l'écran
+    // est affiché - c'est cette mise à jour d'état qui force Compose à
+    // recalculer "controlsVisible" ci-dessus au fil du temps (comparer
+    // System.currentTimeMillis() dans un simple "val" ne suffit pas : sans
+    // état qui change, Compose n'a aucune raison de recomposer).
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(300L)
+            now = System.currentTimeMillis()
+        }
+    }
 
     val playerFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { playerFocusRequester.requestFocus() }
 
-    fun togglePlayPause() {
-        val mp = mediaPlayerComponent.mediaPlayer()
-        if (isPlaying) mp.controls().pause() else mp.controls().play()
-        isPlaying = !isPlaying
+    fun selectChannel(channel: Channel) {
+        onSwitchChannel(channel.streamUrl, channel.name)
+        showChannelPanel = false
+        query = ""
     }
 
     Box(
@@ -170,15 +245,12 @@ fun PlayerScreen(
             .fillMaxSize()
             .focusRequester(playerFocusRequester)
             .focusTarget()
+            .onPointerEvent(PointerEventType.Move) { pingActivity() }
+            .onPointerEvent(PointerEventType.Press) { pingActivity() }
             .onPreviewKeyEvent { event ->
-                // Espace = lecture/pause, comme la quasi-totalité des lecteurs
-                // vidéo (VLC, YouTube...) - raccourci demandé en plus du
-                // bouton, pour ne pas dépendre uniquement de la souris.
-                // IMPORTANT : désactivé tant que le panneau "Changer de
-                // chaîne" est ouvert, sinon taper un espace dans la
-                // recherche (ex: "TF1 HD") coupait la lecture au lieu
-                // d'écrire le caractère.
-                if (!showChannelPanel && event.type == KeyEventType.KeyDown && event.key == Key.Spacebar) {
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                pingActivity()
+                if (!showChannelPanel && event.key == Key.Spacebar) {
                     togglePlayPause()
                     true
                 } else {
@@ -192,226 +264,204 @@ fun PlayerScreen(
                     Text(msg, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(12.dp))
                 }
             }
-            Row(
-                Modifier.fillMaxWidth().padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "Retour")
-                }
-                Spacer(Modifier.width(8.dp))
-                Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
 
-                // Bouton "☰ Chaînes" : ouvre/ferme le panneau de changement de
-                // chaîne sans quitter le lecteur. Masqué s'il n'y a rien
-                // d'autre à proposer (même règle que côté Android :
-                // sideChannels.size > 1).
-                if (playingList.size > 1) {
-                    Surface(
-                        color = SolPlayColors.Orange,
-                        shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier.clickable { showChannelPanel = !showChannelPanel }
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+            AnimatedVisibility(visible = controlsVisible, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+                Row(
+                    Modifier.fillMaxWidth().background(SolPlayColors.SurfaceDark).padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Retour", tint = Color.White)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(title, style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
+
+                    if (playingList.size > 1) {
+                        Surface(
+                            color = SolPlayColors.Orange,
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.clickable { showChannelPanel = !showChannelPanel; pingActivity() }
                         ) {
-                            Icon(Icons.Filled.Menu, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Chaînes", color = Color.White, fontWeight = FontWeight.Bold)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Icon(Icons.Filled.Menu, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Chaînes", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
             }
-            SwingPanel(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                factory = { mediaPlayerComponent }
-            )
 
-            // Barre de contrôle : toujours dans le flux normal de la Column
-            // (jamais superposée à la vidéo ni dépendante d'une taille fixe
-            // calculée à l'avance), donc jamais coupée/masquée par le
-            // redimensionnement de la fenêtre ou de la vidéo elle-même -
-            // c'est ce qui manquait pour pouvoir mettre en pause.
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .background(SolPlayColors.SurfaceDark)
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { togglePlayPause() }) {
-                    Icon(
-                        if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Lecture",
-                        tint = SolPlayColors.Orange,
-                        modifier = Modifier.size(28.dp)
+            // Vidéo + panneau "Changer de chaîne" comme deux VRAIS voisins
+            // dans la même Row (jamais empilés) - voir la note en tête de
+            // fichier.
+            Row(Modifier.weight(1f).fillMaxWidth()) {
+                Box(Modifier.weight(1f).fillMaxHeight()) {
+                    if (pausedFrame != null) {
+                        Image(
+                            bitmap = pausedFrame!!,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().background(Color.Black),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        SwingPanel(modifier = Modifier.fillMaxSize(), factory = { mediaPlayerComponent })
+                    }
+                }
+
+                if (showChannelPanel) {
+                    ChannelSwitchPanel(
+                        playingList = playingList,
+                        currentStreamUrl = streamUrl,
+                        query = query,
+                        onQueryChange = { query = it; pingActivity() },
+                        onSelect = ::selectChannel
                     )
                 }
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    if (isPlaying) "Lecture en cours — Espace ou clic pour mettre en pause"
-                    else "En pause — Espace ou clic pour reprendre",
-                    color = SolPlayColors.White60,
-                    style = MaterialTheme.typography.labelMedium
-                )
+            }
+
+            AnimatedVisibility(visible = controlsVisible, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(SolPlayColors.SurfaceDark)
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { togglePlayPause(); pingActivity() }) {
+                        Icon(
+                            if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Lecture",
+                            tint = SolPlayColors.Orange,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
             }
         }
+    }
+}
 
-        // Panneau latéral "Changer de chaîne" : reste TRANSPARENT/semi-sombre
-        // (pas un fond blanc opaque) puisqu'il se superpose à la vidéo en
-        // cours - mêmes couleurs que le panneau équivalent de l'app Android
-        // (solplay_panel_overlay / solplay_panel_header_overlay /
-        // solplay_search_bg_overlay / solplay_white_60, voir Theme.kt).
-        if (showChannelPanel) {
-            val filtered = remember(playingList, query) {
-                if (query.isBlank()) playingList
-                else playingList.filter { it.name.contains(query, ignoreCase = true) }
-            }
-            val listState = rememberLazyListState()
-            val searchFocusRequester = remember { FocusRequester() }
-            val listFocusRequester = remember { FocusRequester() }
-            LaunchedEffect(Unit) { searchFocusRequester.requestFocus() }
+/** Panneau "Changer de chaîne" - toujours un vrai voisin de mise en page, jamais un calque sur la vidéo (voir PlayerScreen). */
+@Composable
+private fun ChannelSwitchPanel(
+    playingList: List<Channel>,
+    currentStreamUrl: String,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onSelect: (Channel) -> Unit
+) {
+    val filtered = remember(playingList, query) {
+        if (query.isBlank()) playingList else playingList.filter { it.name.contains(query, ignoreCase = true) }
+    }
+    val listState = rememberLazyListState()
+    val searchFocusRequester = remember { FocusRequester() }
+    val listFocusRequester = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(Unit) { searchFocusRequester.requestFocus() }
 
-            fun selectChannel(channel: Channel) {
-                onSwitchChannel(channel.streamUrl, channel.name)
-                showChannelPanel = false
-                query = ""
-            }
+    Column(
+        modifier = Modifier
+            .fillMaxHeight()
+            .width(320.dp)
+            .background(SolPlayColors.SurfaceDark)
+    ) {
+        Surface(color = SolPlayColors.OrangeDark, modifier = Modifier.fillMaxWidth()) {
+            Text("Changer de chaîne", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(12.dp))
+        }
 
-            Column(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight()
-                    .width(320.dp)
-                    .background(SolPlayColors.PanelOverlay)
-            ) {
-                Surface(color = SolPlayColors.PanelHeaderOverlay, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        "Changer de chaîne",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(12.dp)
-                    )
-                }
-
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    placeholder = { Text("Rechercher une chaîne...", color = SolPlayColors.White60) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedContainerColor = SolPlayColors.SearchOverlayBg,
-                        unfocusedContainerColor = SolPlayColors.SearchOverlayBg,
-                        focusedBorderColor = SolPlayColors.White60,
-                        unfocusedBorderColor = Color.Transparent,
-                        cursorColor = Color.White
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(10.dp)
-                        .focusRequester(searchFocusRequester)
-                        .onPreviewKeyEvent { event ->
-                            // Depuis le champ de recherche : Bas descend dans
-                            // la liste des résultats, Entrée ouvre directement
-                            // le premier résultat filtré - pas besoin de sortir
-                            // du clavier pour naviguer vers la liste.
-                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                            when (event.key) {
-                                Key.DirectionDown -> {
-                                    scope.launch { listState.scrollToItem(0) }
-                                    listFocusRequester.requestFocus()
-                                    true
-                                }
-                                Key.Enter, Key.NumPadEnter -> {
-                                    filtered.getOrNull(0)?.let { selectChannel(it) }
-                                    true
-                                }
-                                else -> false
-                            }
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            placeholder = { Text("Rechercher une chaîne...", color = SolPlayColors.White60) },
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedContainerColor = SolPlayColors.Gray,
+                unfocusedContainerColor = SolPlayColors.Gray,
+                focusedBorderColor = SolPlayColors.White60,
+                unfocusedBorderColor = Color.Transparent,
+                cursorColor = Color.White
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp)
+                .focusRequester(searchFocusRequester)
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (event.key) {
+                        Key.DirectionDown -> {
+                            scope.launch { listState.scrollToItem(0) }
+                            listFocusRequester.requestFocus()
+                            true
                         }
-                )
+                        Key.Enter, Key.NumPadEnter -> {
+                            filtered.getOrNull(0)?.let { onSelect(it) }
+                            true
+                        }
+                        else -> false
+                    }
+                }
+        )
 
-                if (filtered.isEmpty()) {
-                    Text(
-                        "Aucune chaîne trouvée.",
-                        color = SolPlayColors.White60,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                } else {
-                    // Liste navigable aux 4 flèches, comme toutes les autres
-                    // listes de l'app (même mécanique que HomeScreen/EpgGridScreen :
-                    // FocusRequester + onPreviewKeyEvent). Gauche/droite sautent
-                    // de 10 éléments (liste à une seule colonne, pas de voisin
-                    // latéral évident) au lieu de rester sans effet.
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .focusRequester(listFocusRequester)
-                            .focusTarget()
-                            .onPreviewKeyEvent { event ->
-                                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                                val index = listState.firstVisibleItemIndex
-                                when (event.key) {
-                                    Key.DirectionDown -> {
-                                        scope.launch { listState.animateScrollToItem((index + 1).coerceAtMost(filtered.lastIndex)) }
-                                        true
-                                    }
-                                    Key.DirectionUp -> {
-                                        scope.launch { listState.animateScrollToItem((index - 1).coerceAtLeast(0)) }
-                                        true
-                                    }
-                                    Key.DirectionRight, Key.PageDown -> {
-                                        scope.launch { listState.animateScrollToItem((index + 10).coerceAtMost(filtered.lastIndex)) }
-                                        true
-                                    }
-                                    Key.DirectionLeft, Key.PageUp -> {
-                                        scope.launch { listState.animateScrollToItem((index - 10).coerceAtLeast(0)) }
-                                        true
-                                    }
-                                    Key.Enter, Key.NumPadEnter -> {
-                                        filtered.getOrNull(index)?.let { selectChannel(it) }
-                                        true
-                                    }
-                                    else -> false
-                                }
+        if (filtered.isEmpty()) {
+            Text("Aucune chaîne trouvée.", color = SolPlayColors.White60, modifier = Modifier.padding(16.dp))
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .focusRequester(listFocusRequester)
+                    .focusTarget()
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        val index = listState.firstVisibleItemIndex
+                        when (event.key) {
+                            Key.DirectionDown -> {
+                                scope.launch { listState.animateScrollToItem((index + 1).coerceAtMost(filtered.lastIndex)) }
+                                true
                             }
+                            Key.DirectionUp -> {
+                                scope.launch { listState.animateScrollToItem((index - 1).coerceAtLeast(0)) }
+                                true
+                            }
+                            Key.Enter, Key.NumPadEnter -> {
+                                filtered.getOrNull(index)?.let { onSelect(it) }
+                                true
+                            }
+                            else -> false
+                        }
+                    }
+            ) {
+                items(filtered, key = { it.streamUrl }) { channel ->
+                    val isActive = channel.streamUrl == currentStreamUrl
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(channel) }
+                            .background(if (isActive) SolPlayColors.Gray else Color.Transparent)
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        items(filtered, key = { it.streamUrl }) { channel ->
-                            val isActive = channel.streamUrl == streamUrl
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { selectChannel(channel) }
-                                    .background(if (isActive) SolPlayColors.SearchOverlayBg else Color.Transparent)
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(Modifier.size(40.dp).clip(RoundedCornerShape(4.dp)).background(SolPlayColors.SearchOverlayBg)) {
-                                    AsyncImage(
-                                        channel.logoUrl,
-                                        channel.name,
-                                        Modifier.fillMaxSize(),
-                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                                    )
-                                }
-                                Spacer(Modifier.width(12.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(
-                                        channel.name,
-                                        color = if (isActive) SolPlayColors.Orange else Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                    )
-                                    channel.groupTitle?.takeIf { it.isNotBlank() }?.let {
-                                        Text(it, color = SolPlayColors.White60, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-                                    }
-                                }
+                        Box(Modifier.size(40.dp).clip(RoundedCornerShape(4.dp)).background(SolPlayColors.Gray)) {
+                            AsyncImage(channel.logoUrl, channel.name, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                channel.name,
+                                color = if (isActive) SolPlayColors.Orange else Color.White,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                            channel.groupTitle?.takeIf { it.isNotBlank() }?.let {
+                                Text(it, color = SolPlayColors.White60, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                             }
                         }
                     }
@@ -420,3 +470,4 @@ fun PlayerScreen(
         }
     }
 }
+
