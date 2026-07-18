@@ -34,6 +34,16 @@ class Context private constructor(val storageDir: File) {
 
     val applicationContext: Context get() = this
 
+    /**
+     * Équivalent d'Android Context.filesDir : un dossier de fichiers internes
+     * à l'app, distinct des préférences (utilisé par ChannelCacheStore.kt,
+     * porté tel quel depuis l'app Android, pour le cache JSON des chaînes).
+     * Même dossier parent que les préférences, sous-dossier "files".
+     */
+    val filesDir: File by lazy {
+        File(storageDir.parentFile ?: storageDir, "files").apply { mkdirs() }
+    }
+
     fun getSharedPreferences(name: String, mode: Int): SharedPreferences =
         SharedPreferences(File(storageDir, "$name.json"))
 }
