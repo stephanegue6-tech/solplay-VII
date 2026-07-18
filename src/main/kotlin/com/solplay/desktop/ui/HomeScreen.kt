@@ -35,12 +35,15 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.solplay.desktop.core.AsyncImage
 import com.solplay.iptv.Bouquet
 import com.solplay.iptv.Channel
 import com.solplay.iptv.ContentType
+import com.solplay.iptv.DeviceKeyManager
 import com.solplay.iptv.DevicePlaylistSync
+import com.solplay.iptv.ParentalControl
 import com.solplay.iptv.PlaylistStore
 import com.solplay.iptv.SavedPlaylist
 import com.solplay.iptv.TrialManager
@@ -61,12 +64,12 @@ private const val ALL_BOUQUETS = "Tous"
  * Revérification d'accès : contrairement à Android (ChannelsActivity.onResume,
  * PlayerActivity périodique), une fenêtre desktop n'a pas de cycle de vie
  * "pause/resume" à exploiter - l'écran peut rester affiché des heures sans
- * jamais être quitté. On revérifie donc ici nous-mêmes toutes les 2 minutes,
- * tant que cet écran est affiché, si l'admin a désactivé/supprimé
- * l'assignation ou le code ayant servi à obtenir cette playlist
- * (DevicePlaylistSync.checkStillAssigned couvre les deux cas). Si l'accès a
- * été retiré, on supprime la playlist locale et on renvoie vers l'écran de
- * connexion, comme sur Android.
+ * jamais être quitté. On revérifie donc ici nous-mêmes immédiatement puis
+ * toutes les 30 secondes, tant que cet écran est affiché, si l'admin a
+ * désactivé/supprimé l'assignation ou le code ayant servi à obtenir cette
+ * playlist (DevicePlaylistSync.checkStillAssigned couvre les deux cas). Si
+ * l'accès a été retiré, on supprime la playlist locale et on renvoie vers
+ * l'écran de connexion, comme sur Android.
  */
 @Composable
 fun HomeScreen(
@@ -81,12 +84,14 @@ fun HomeScreen(
     LaunchedEffect(playlist.id) {
         val tag = playlist.fromCode ?: return@LaunchedEffect
         while (true) {
-            delay(120_000L) // 2 min, même intervalle que PlayerActivity côté Android
+            // Vérification immédiate à chaque tour, puis 30s (au lieu de 2min) -
+            // aligné sur le même correctif que PlayerActivity côté Android.
             if (!DevicePlaylistSync.checkStillAssigned(context, tag)) {
                 PlaylistStore.delete(context, playlist.id)
                 revokedMessage = "L'accès à cette playlist a été retiré par l'administrateur."
                 break
             }
+            delay(30_000L)
         }
     }
 
@@ -130,6 +135,28 @@ fun HomeScreen(
     var episodes by remember { mutableStateOf<List<Channel>>(emptyList()) }
     var ficheChannel by remember { mutableStateOf<Channel?>(null) }
 
+    // Contrôle parental : action mise en attente tant que le code n'a pas
+    // été validé (ouverture d'une chaîne adulte, ou sélection d'un bouquet
+    // adulte) - voir ParentalControl.kt. `pinError` affiche un message si le
+    // dernier code saisi était incorrect.
+    var pendingUnlock by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var pinInput by remember { mutableStateOf("") }
+    var pinError by remember { mutableStateOf(false) }
+    // Miroir Compose-réactif de ParentalControl.isUnlocked() : l'objet lui-même
+    // n'est qu'une variable @Volatile, donc la lire directement dans un Text()
+    // ne provoquerait aucune recomposition au déverrouillage - ce state si.
+    var sessionUnlocked by remember { mutableStateOf(ParentalControl.isUnlocked()) }
+
+    fun requireParentalPinIfNeeded(isAdult: Boolean, action: () -> Unit) {
+        if (!isAdult || ParentalControl.isUnlocked()) {
+            action()
+        } else {
+            pinInput = ""
+            pinError = false
+            pendingUnlock = action
+        }
+    }
+
     val channelsForType = remember(allChannels, currentType) {
         allChannels.filter { it.contentType() == currentType }
     }
@@ -159,6 +186,10 @@ fun HomeScreen(
     }
 
     fun handleClick(channel: Channel) {
+        if (ParentalControl.isAdultChannel(channel) && !ParentalControl.isUnlocked()) {
+            requireParentalPinIfNeeded(true) { handleClick(channel) }
+            return
+        }
         when (currentType) {
             ContentType.LIVE -> {
                 // Alimente ChannelRepository.playingList (liste actuellement
@@ -206,6 +237,46 @@ fun HomeScreen(
                 PlaylistStore.setActiveId(context, null)
                 onDisconnect()
             }) { Text("Changer de compte") }
+        }
+        Spacer(Modifier.height(8.dp))
+
+        // Petit bandeau permanent (demandé) : clé appareil de ce PC + temps
+        // restant sur la licence/l'essai, toujours visible en haut de
+        // l'écran d'accueil - pas seulement dans "À propos" - pour que
+        // l'utilisateur (ou l'admin en support à distance) puisse lire ces
+        // deux infos d'un coup d'œil sans naviguer dans un sous-écran.
+        Surface(
+            color = SolPlayColors.Gray,
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Clé appareil : ${DeviceKeyManager.getDeviceKey(context)}",
+                    color = SolPlayColors.White,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(12.dp))
+                val remainingText = remember {
+                    if (TrialManager.isLicensed(context)) {
+                        val remaining = TrialManager.getRemainingLicenseMillis(context)
+                        if (remaining == Long.MAX_VALUE) "Licence illimitée"
+                        else "Licence : ${TrialManager.formatDuration(remaining)} restant"
+                    } else {
+                        "Essai : ${TrialManager.formatDuration(TrialManager.getRemainingTrialMillis(context))} restant"
+                    }
+                }
+                Text(
+                    remainingText,
+                    color = SolPlayColors.Orange,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
         Spacer(Modifier.height(12.dp))
 
@@ -266,10 +337,15 @@ fun HomeScreen(
                 FilterChip(
                     selected = currentBouquet == b.name,
                     onClick = {
-                        currentBouquet = b.name
-                        bouquetFocusRequester.requestFocus()
+                        requireParentalPinIfNeeded(ParentalControl.isAdultLabel(b.name)) {
+                            currentBouquet = b.name
+                            bouquetFocusRequester.requestFocus()
+                        }
                     },
-                    label = { Text("${b.name} (${b.channelCount})") },
+                    label = {
+                        val locked = ParentalControl.isAdultLabel(b.name) && !sessionUnlocked
+                        Text(if (locked) "🔒 ${b.name} (${b.channelCount})" else "${b.name} (${b.channelCount})")
+                    },
                     modifier = Modifier.padding(end = 6.dp)
                 )
             }
@@ -525,6 +601,58 @@ fun HomeScreen(
             title = { Text("⚠️ Abonnement expiré") },
             text = { Text(msg) },
             confirmButton = { TextButton(onClick = { expiryMessage = null }) { Text("OK") } }
+        )
+    }
+
+    // Code parental : bloque l'accès à une chaîne/un bouquet détecté comme
+    // contenu adulte (voir ParentalControl.kt) tant que le bon code n'a pas
+    // été saisi. Équivalent desktop de showParentalPinDialog côté Android.
+    pendingUnlock?.let { action ->
+        AlertDialog(
+            onDismissRequest = { pendingUnlock = null },
+            title = { Text("🔒 Contenu réservé aux adultes") },
+            text = {
+                Column {
+                    Text("Cette catégorie est protégée. Entrez le code parental pour continuer.")
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = pinInput,
+                        onValueChange = {
+                            if (it.length <= 4 && it.all(Char::isDigit)) {
+                                pinInput = it
+                                pinError = false
+                            }
+                        },
+                        label = { Text("Code (4 chiffres)") },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
+                        ),
+                        isError = pinError,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (pinError) {
+                        Text("Code incorrect.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (ParentalControl.verifyPin(context, pinInput)) {
+                        ParentalControl.unlock()
+                        sessionUnlocked = true
+                        val toRun = action
+                        pendingUnlock = null
+                        toRun()
+                    } else {
+                        pinError = true
+                    }
+                }) { Text("Valider") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingUnlock = null }) { Text("Annuler") }
+            }
         )
     }
 }

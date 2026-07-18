@@ -124,6 +124,17 @@ compose.desktop {
                 // logo source. Utilisée pour l'exécutable, le raccourci du
                 // menu Démarrer, et l'installeur .msi lui-même.
                 iconFile.set(project.file("src/main/resources/solplay.ico"))
+
+                // IMPORTANT : ces deux options sont à FALSE par défaut chez
+                // jpackage/Compose Desktop. Sans elles, le .msi installe bien
+                // l'app (elle tourne, elle apparaît dans "Applications et
+                // fonctionnalités") mais ne crée AUCUN raccourci visible nulle
+                // part - ni sur le Bureau, ni dans le menu Démarrer, donc pas
+                // trouvable non plus via la barre de recherche Windows (qui
+                // n'indexe que les raccourcis du menu Démarrer, pas les .exe
+                // dans Program Files). C'était la cause du souci signalé.
+                menu = true      // entrée dans le menu Démarrer -> apparaît aussi dans la recherche Windows
+                shortcut = true  // raccourci créé directement sur le Bureau
             }
         }
     }

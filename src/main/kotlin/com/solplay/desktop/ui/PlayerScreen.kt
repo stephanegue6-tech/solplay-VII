@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -85,13 +87,18 @@ fun PlayerScreen(
     LaunchedEffect(playlist.id) {
         val tag = playlist.fromCode ?: return@LaunchedEffect
         while (true) {
-            delay(120_000L) // même intervalle que PlayerActivity côté Android
+            // Vérification IMMÉDIATE à chaque tour (pas de delay avant le
+            // premier contrôle) : aligné sur le correctif appliqué côté
+            // Android (PlayerActivity), qui vérifiait auparavant seulement
+            // après 2 minutes, laissant passer sans coupure toute lecture
+            // démarrée juste après une désactivation/suppression admin.
             if (!DevicePlaylistSync.checkStillAssigned(context, tag)) {
                 mediaPlayerComponent.mediaPlayer().controls().stop()
                 PlaylistStore.delete(context, playlist.id)
                 revokedMessage = "L'accès à cette playlist a été retiré par l'administrateur."
                 break
             }
+            delay(30_000L) // même intervalle que PlayerActivity côté Android
         }
     }
 
@@ -110,6 +117,14 @@ fun PlayerScreen(
     // handle de fenêtre natif (HWND côté Windows) déjà valide pour
     // attacher la sortie vidéo. On attend donc que le composant soit
     // effectivement "displayable" avant de démarrer la lecture.
+    //
+    // setScale(0f) juste après : force VLC à recalculer lui-même le
+    // cadrage/zoom de la vidéo par rapport à la taille RÉELLE du panneau
+    // une fois affiché, au lieu de garder la géométrie calculée au tout
+    // premier instant (souvent 0x0 ou une taille provisoire avant que
+    // SwingPanel ait fini de se dimensionner) - c'est ce qui causait
+    // l'image décalée/rognée en bas d'écran signalée.
+    var isPlaying by remember { mutableStateOf(true) }
     LaunchedEffect(streamUrl) {
         var attempts = 0
         while (!mediaPlayerComponent.isDisplayable && attempts < 150) { // ~3s max
@@ -117,6 +132,10 @@ fun PlayerScreen(
             attempts++
         }
         mediaPlayerComponent.mediaPlayer().media().play(streamUrl)
+        isPlaying = true
+        delay(300L) // laisse VLC ouvrir le flux avant de fixer le cadrage
+        mediaPlayerComponent.mediaPlayer().video().setScale(0f) // 0 = ajustement automatique
+        mediaPlayerComponent.mediaPlayer().video().setAspectRatio(null)
     }
 
     DisposableEffect(streamUrl) {
@@ -137,7 +156,36 @@ fun PlayerScreen(
     var query by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
-    Box(Modifier.fillMaxSize()) {
+    val playerFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { playerFocusRequester.requestFocus() }
+
+    fun togglePlayPause() {
+        val mp = mediaPlayerComponent.mediaPlayer()
+        if (isPlaying) mp.controls().pause() else mp.controls().play()
+        isPlaying = !isPlaying
+    }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .focusRequester(playerFocusRequester)
+            .focusTarget()
+            .onPreviewKeyEvent { event ->
+                // Espace = lecture/pause, comme la quasi-totalité des lecteurs
+                // vidéo (VLC, YouTube...) - raccourci demandé en plus du
+                // bouton, pour ne pas dépendre uniquement de la souris.
+                // IMPORTANT : désactivé tant que le panneau "Changer de
+                // chaîne" est ouvert, sinon taper un espace dans la
+                // recherche (ex: "TF1 HD") coupait la lecture au lieu
+                // d'écrire le caractère.
+                if (!showChannelPanel && event.type == KeyEventType.KeyDown && event.key == Key.Spacebar) {
+                    togglePlayPause()
+                    true
+                } else {
+                    false
+                }
+            }
+    ) {
         Column(Modifier.fillMaxSize()) {
             revokedMessage?.let { msg ->
                 Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
@@ -179,6 +227,35 @@ fun PlayerScreen(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 factory = { mediaPlayerComponent }
             )
+
+            // Barre de contrôle : toujours dans le flux normal de la Column
+            // (jamais superposée à la vidéo ni dépendante d'une taille fixe
+            // calculée à l'avance), donc jamais coupée/masquée par le
+            // redimensionnement de la fenêtre ou de la vidéo elle-même -
+            // c'est ce qui manquait pour pouvoir mettre en pause.
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(SolPlayColors.SurfaceDark)
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { togglePlayPause() }) {
+                    Icon(
+                        if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Lecture",
+                        tint = SolPlayColors.Orange,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    if (isPlaying) "Lecture en cours — Espace ou clic pour mettre en pause"
+                    else "En pause — Espace ou clic pour reprendre",
+                    color = SolPlayColors.White60,
+                    style = MaterialTheme.typography.labelMedium
+                )
+            }
         }
 
         // Panneau latéral "Changer de chaîne" : reste TRANSPARENT/semi-sombre
@@ -192,8 +269,9 @@ fun PlayerScreen(
                 else playingList.filter { it.name.contains(query, ignoreCase = true) }
             }
             val listState = rememberLazyListState()
-            val panelFocusRequester = remember { FocusRequester() }
-            LaunchedEffect(Unit) { panelFocusRequester.requestFocus() }
+            val searchFocusRequester = remember { FocusRequester() }
+            val listFocusRequester = remember { FocusRequester() }
+            LaunchedEffect(Unit) { searchFocusRequester.requestFocus() }
 
             fun selectChannel(channel: Channel) {
                 onSwitchChannel(channel.streamUrl, channel.name)
@@ -231,7 +309,29 @@ fun PlayerScreen(
                         unfocusedBorderColor = Color.Transparent,
                         cursorColor = Color.White
                     ),
-                    modifier = Modifier.fillMaxWidth().padding(10.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp)
+                        .focusRequester(searchFocusRequester)
+                        .onPreviewKeyEvent { event ->
+                            // Depuis le champ de recherche : Bas descend dans
+                            // la liste des résultats, Entrée ouvre directement
+                            // le premier résultat filtré - pas besoin de sortir
+                            // du clavier pour naviguer vers la liste.
+                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                            when (event.key) {
+                                Key.DirectionDown -> {
+                                    scope.launch { listState.scrollToItem(0) }
+                                    listFocusRequester.requestFocus()
+                                    true
+                                }
+                                Key.Enter, Key.NumPadEnter -> {
+                                    filtered.getOrNull(0)?.let { selectChannel(it) }
+                                    true
+                                }
+                                else -> false
+                            }
+                        }
                 )
 
                 if (filtered.isEmpty()) {
@@ -251,7 +351,7 @@ fun PlayerScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
-                            .focusRequester(panelFocusRequester)
+                            .focusRequester(listFocusRequester)
                             .focusTarget()
                             .onPreviewKeyEvent { event ->
                                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
