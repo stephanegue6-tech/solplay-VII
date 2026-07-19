@@ -79,8 +79,8 @@ dependencies {
         exclude(group = "org.bytedeco", module = "leptonica")
         exclude(group = "org.bytedeco", module = "tesseract")
     }
-    implementation("org.bytedeco:ffmpeg:6.0-1.5.10")
-    implementation("org.bytedeco:ffmpeg:6.0-1.5.10:windows-x86_64")
+    implementation("org.bytedeco:ffmpeg:6.1.1-1.5.10")
+    implementation("org.bytedeco:ffmpeg:6.1.1-1.5.10:windows-x86_64")
 
     // Requêtes HTTP vers Firebase REST, Xtream, TMDB, M3U - remplace les
     // appels utilisant le SDK Android Firebase (indisponible hors Android).
