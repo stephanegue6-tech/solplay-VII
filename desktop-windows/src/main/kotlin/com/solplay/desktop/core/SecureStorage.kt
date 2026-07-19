@@ -43,7 +43,9 @@ object SecureStorage {
      */
     fun encrypt(plainText: String): String {
         if (plainText.isEmpty()) return ""
-        val encryptedBytes = Crypt32Util.cryptProtectData(plainText.toByteArray(Charsets.UTF_8), ENTROPY)
+        val encryptedBytes = Crypt32Util.cryptProtectData(
+            plainText.toByteArray(Charsets.UTF_8), ENTROPY, 0, "SolPlayDesktop", null
+        )
         return Base64.getEncoder().encodeToString(encryptedBytes)
     }
 
@@ -59,7 +61,7 @@ object SecureStorage {
         if (cipherTextBase64.isEmpty()) return ""
         return try {
             val encryptedBytes = Base64.getDecoder().decode(cipherTextBase64)
-            val decryptedBytes = Crypt32Util.cryptUnprotectData(encryptedBytes, ENTROPY)
+            val decryptedBytes = Crypt32Util.cryptUnprotectData(encryptedBytes, ENTROPY, 0, null)
             String(decryptedBytes, Charsets.UTF_8)
         } catch (e: Exception) {
             ""
