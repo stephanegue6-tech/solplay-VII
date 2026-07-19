@@ -27,15 +27,15 @@ object ChannelRepository {
     var epgGridChannels: List<Channel> = emptyList()
         private set
 
-    fun setChannels(newChannels: List<Channel>) {
+    fun updateChannels(newChannels: List<Channel>) {
         channels = newChannels
     }
 
-    fun setPlayingList(list: List<Channel>) {
+    fun updatePlayingList(list: List<Channel>) {
         playingList = list
     }
 
-    fun setEpgGridChannels(list: List<Channel>) {
+    fun updateEpgGridChannels(list: List<Channel>) {
         epgGridChannels = list
     }
 

@@ -157,7 +157,7 @@ private suspend fun connectAndLoad(
         PlaylistStore.save(context, playlist)
         PlaylistStore.setActiveId(context, playlist.id)
         ChannelCacheStore.save(context, playlist.id, channels)
-        ChannelRepository.setChannels(channels)
+        ChannelRepository.updateChannels(channels)
         onConnected(playlist)
     } catch (e: PlaylistLoadException) {
         onError(e.message ?: "Erreur de chargement.")

@@ -200,7 +200,7 @@ fun HomeScreen(
                 // lecteur : c'est cette liste que PlayerScreen utilise pour
                 // son panneau "☰ Chaînes" (changer de chaîne sans revenir en
                 // arrière). Même principe que ChannelsActivity côté Android.
-                com.solplay.iptv.ChannelRepository.setPlayingList(filtered)
+                com.solplay.iptv.ChannelRepository.updatePlayingList(filtered)
                 onPlay(channel.streamUrl, channel.name)
             }
             ContentType.MOVIE -> ficheChannel = channel
@@ -625,7 +625,7 @@ fun HomeScreen(
                                 ListItem(
                                     headlineContent = { Text(episode.name) },
                                     modifier = Modifier.clickable {
-                                        com.solplay.iptv.ChannelRepository.setPlayingList(episodes)
+                                        com.solplay.iptv.ChannelRepository.updatePlayingList(episodes)
                                         episodesDialogFor = null
                                         onPlay(episode.streamUrl, episode.name)
                                     }

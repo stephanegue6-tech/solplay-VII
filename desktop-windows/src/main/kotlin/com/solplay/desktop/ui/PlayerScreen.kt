@@ -129,7 +129,7 @@ fun PlayerScreen(
 
     fun togglePlayPause() {
         isPlaying = !isPlaying
-        decoder.setPaused(!isPlaying)
+        decoder.paused = !isPlaying
         // Contrairement à VLC, pas besoin de capturer/convertir un
         // "pausedFrame" séparé : le décodeur s'arrête juste de fournir de
         // nouveaux frames pendant la pause, donc `currentFrame` (déjà à

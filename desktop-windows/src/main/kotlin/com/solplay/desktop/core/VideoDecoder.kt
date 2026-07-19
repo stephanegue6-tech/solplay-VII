@@ -185,10 +185,6 @@ class VideoDecoder {
 
     private fun isCurrent(session: Session): Boolean = currentSession.get() === session
 
-    fun setPaused(value: Boolean) {
-        paused = value
-    }
-
     fun stop() {
         val session = currentSession.getAndSet(null) ?: run {
             job?.cancel()
