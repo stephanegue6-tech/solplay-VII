@@ -9,22 +9,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.solplay.desktop.core.VlcCheck
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 
 /**
- * [onDone] reçoit si VLC a été détecté sur la machine, vérifié en parallèle
- * du petit délai d'affichage du splash (donc sans coût de temps perçu dans
- * le cas courant où VLC est déjà installé) - voir VlcCheck.kt.
+ * v18 : la vérification "VLC installé ?" a été retirée - le lecteur vidéo
+ * décode maintenant lui-même les flux via FFmpeg embarqué (voir
+ * VideoDecoder.kt), sans dépendre d'une installation externe.
  */
 @Composable
-fun SplashScreen(onDone: (vlcAvailable: Boolean) -> Unit) {
+fun SplashScreen(onDone: () -> Unit) {
     LaunchedEffect(Unit) {
-        val vlcCheck = async(Dispatchers.IO) { VlcCheck.isAvailable() }
         delay(1200)
-        onDone(vlcCheck.await())
+        onDone()
     }
     Box(Modifier.fillMaxSize().background(SolPlayColors.Black), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {

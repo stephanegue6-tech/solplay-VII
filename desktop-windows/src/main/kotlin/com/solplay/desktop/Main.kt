@@ -7,6 +7,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowState
+import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.rememberTrayState
 import androidx.compose.ui.window.Notification
@@ -34,7 +35,6 @@ import kotlinx.coroutines.delay
 /** Écran actuellement affiché - équivalent desktop de la navigation entre Activities Android. */
 sealed class Screen {
     object Splash : Screen()
-    object VlcMissing : Screen()
     object License : Screen()
     object Connect : Screen()
     data class Home(val playlist: SavedPlaylist) : Screen()
@@ -42,7 +42,20 @@ sealed class Screen {
     data class EpgGrid(val playlist: SavedPlaylist, val channels: List<Channel>) : Screen()
 }
 
-fun main() = application {
+fun main() {
+    // Le moteur de rendu Compose (Skia/Skiko) utilise Direct3D par défaut
+    // sur Windows, qui peut entrer en conflit avec le rendu vidéo GPU natif
+    // de VLC (deux composants distincts se disputant le même pipeline
+    // graphique) - un symptôme documenté de ce conflit est un écran vidéo
+    // qui clignote noir/blanc ou affiche une image corrompue (voir aussi
+    // PlayerScreen.kt, qui désactive côté VLC le décodage matériel pour la
+    // même raison). Basculer Skiko sur OpenGL, un pipeline plus permissif
+    // vis-à-vis du partage GPU avec d'autres composants natifs, résout ce
+    // conflit dans la majorité des cas connus. DOIT être défini avant tout
+    // appel à du code Compose, d'où sa présence tout en haut de main().
+    System.setProperty("skiko.renderApi", "OPENGL")
+
+    application {
     val ctx = Context.APP // stockage local (%APPDATA%\SolPlay), voir ContextShim.kt
 
     // Pile de navigation façon back-stack Android, au lieu d'un simple
@@ -149,9 +162,22 @@ fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
         title = "SolPlay",
-        state = WindowState(size = DpSize(1280.dp, 800.dp)),
+        // Démarre en plein écran (maximisé) plutôt qu'à une taille fixe de
+        // 1280x800 : s'adapte automatiquement à N'IMPORTE QUELLE résolution
+        // d'écran (petit portable 1366x768, moniteur 1080p, 4K...) au lieu
+        // d'imposer une fenêtre qui peut déborder ou laisser trop d'espace
+        // vide selon l'écran de l'utilisateur. DpSize(1280,800) reste
+        // utilisé comme taille de repli si jamais l'utilisateur démaximise
+        // la fenêtre.
+        state = WindowState(size = DpSize(1280.dp, 800.dp), placement = WindowPlacement.Maximized),
         icon = painterResource("solplay_icon.png")
     ) {
+        // Taille minimale de la fenêtre : protège la mise en page (grille
+        // films/séries, panneau "Changer de chaîne", etc.) si l'utilisateur
+        // démaximise puis rétrécit manuellement la fenêtre en dessous d'une
+        // taille utilisable.
+        LaunchedEffect(Unit) { window.minimumSize = java.awt.Dimension(960, 600) }
+
         LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
         Box(
@@ -177,16 +203,7 @@ fun main() = application {
                 Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
                 when (val s = screen) {
                     is Screen.Splash -> SplashScreen(
-                        onDone = { vlcAvailable ->
-                            replaceWith(
-                                if (!vlcAvailable) Screen.VlcMissing
-                                else if (TrialManager.canAccessApp(ctx)) Screen.Connect
-                                else Screen.License
-                            )
-                        }
-                    )
-                    is Screen.VlcMissing -> VlcMissingScreen(
-                        onVlcFound = {
+                        onDone = {
                             replaceWith(if (TrialManager.canAccessApp(ctx)) Screen.Connect else Screen.License)
                         }
                     )
@@ -240,4 +257,5 @@ fun main() = application {
             }
         }
     }
+}
 }

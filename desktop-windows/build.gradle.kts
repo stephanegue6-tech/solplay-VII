@@ -43,16 +43,55 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
-    // Lecture vidéo : ExoPlayer (Android) n'existe pas sur desktop. On utilise
-    // VLC via vlcj, qui pilote une installation locale de VLC (gratuite,
-    // https://www.videolan.org) - lit les mêmes formats que le lecteur
-    // Android (HLS, TS, MP4...), donc compatible avec les mêmes flux IPTV.
-    implementation("uk.co.caprica:vlcj:4.8.2")
+    // Lecture vidéo : ExoPlayer (Android) n'existe pas sur desktop.
+    //
+    // Changement de moteur (v18) : abandon de VLC/vlcj au profit d'un
+    // décodage FFmpeg "maison" via javacv (FFmpegFrameGrabber). Raison :
+    // vlcj intègre VLC comme composant natif "lourd" (SwingPanel), sur
+    // lequel Compose ne peut PAS dessiner par-dessus proprement (pas de
+    // vrais calques/overlays, contrôles obligés d'être des voisins de mise
+    // en page plutôt que superposés) - limite structurelle de Compose
+    // Desktop avec tout composant vidéo natif, pas spécifique à VLC.
+    //
+    // javacv-platform embarque les binaires FFmpeg pour chaque OS (dont
+    // Windows) : chaque frame vidéo est décodée nous-mêmes et convertie en
+    // simple image Compose (voir VideoDecoder.kt) - donc plus de composant
+    // natif du tout, overlays/centrage 100% libres comme n'importe quel
+    // autre écran Compose. Bonus : l'utilisateur n'a plus besoin d'installer
+    // VLC séparément, FFmpeg est embarqué dans l'app.
+    // javacv (sans "-platform") + classifier windows-x86_64 UNIQUEMENT :
+    // "javacv-platform" embarque par défaut les binaires FFmpeg de TOUS les
+    // OS (Windows, Linux, macOS, Android...), soit plusieurs centaines de Mo
+    // à télécharger inutilement - vu la connexion limitée, on ne prend que
+    // ce qui sert réellement pour un build/usage Windows.
+    implementation("org.bytedeco:javacv:1.5.10") {
+        exclude(group = "org.bytedeco", module = "ffmpeg")
+        exclude(group = "org.bytedeco", module = "opencv")
+        exclude(group = "org.bytedeco", module = "flycapture")
+        exclude(group = "org.bytedeco", module = "spinnaker")
+        exclude(group = "org.bytedeco", module = "libdc1394")
+        exclude(group = "org.bytedeco", module = "libfreenect")
+        exclude(group = "org.bytedeco", module = "libfreenect2")
+        exclude(group = "org.bytedeco", module = "librealsense")
+        exclude(group = "org.bytedeco", module = "librealsense2")
+        exclude(group = "org.bytedeco", module = "videoinput")
+        exclude(group = "org.bytedeco", module = "artoolkitplus")
+        exclude(group = "org.bytedeco", module = "leptonica")
+        exclude(group = "org.bytedeco", module = "tesseract")
+    }
+    implementation("org.bytedeco:ffmpeg:6.0-1.5.10")
+    implementation("org.bytedeco:ffmpeg:6.0-1.5.10:windows-x86_64")
 
     // Requêtes HTTP vers Firebase REST, Xtream, TMDB, M3U - remplace les
     // appels utilisant le SDK Android Firebase (indisponible hors Android).
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.json:json:20240303")
+
+    // Chiffrement au repos des identifiants Xtream (voir SecureStorage.kt /
+    // PlaylistStore.kt) via l'API Windows DPAPI - jna-platform embarque
+    // Crypt32Util (wrapper haut-niveau de CryptProtectData/CryptUnprotectData)
+    // et entraîne "jna" en dépendance transitive.
+    implementation("net.java.dev.jna:jna-platform:5.14.0")
 
     testImplementation(kotlin("test"))
 }

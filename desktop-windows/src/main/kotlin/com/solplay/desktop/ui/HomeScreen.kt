@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -79,6 +81,7 @@ fun HomeScreen(
     onOpenEpgGrid: (List<Channel>) -> Unit,
     onDisconnect: () -> Unit
 ) {
+    val density = LocalDensity.current
     var revokedMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(playlist.id) {
@@ -439,20 +442,39 @@ fun HomeScreen(
             // que la liste brute utilisée pour le Live - beaucoup plus
             // lisible pour parcourir un catalogue VOD, et cohérent avec ce
             // qu'affichent la plupart des apps IPTV pour ce type de contenu.
-            val gridColumns = 5
+            //
+            // Colonnes ADAPTATIVES (Adaptive) plutôt qu'un nombre FIXE de 5 :
+            // un nombre fixe donnait des colonnes minuscules et serrées sur
+            // un petit écran/fenêtre (ex: portable 1366px de large) et,
+            // inversement, des colonnes exagérément larges sur un grand
+            // moniteur ou en 4K. GridCells.Adaptive(minSize) calcule tout
+            // seul le nombre de colonnes qui tient réellement dans la
+            // largeur disponible, avec ~150dp minimum par affiche - ce qui
+            // donne un nombre de colonnes cohérent quelle que soit la
+            // taille d'écran/fenêtre (démaximisée, agrandie, tout écran...).
             val gridState = rememberLazyGridState()
             val gridFocusRequester = remember { FocusRequester() }
+            // Nombre de colonnes réellement affichées à cet instant, recalculé
+            // dynamiquement par Compose selon la largeur du conteneur -
+            // utilisé ci-dessous uniquement pour la navigation au clavier
+            // (savoir de combien d'éléments sauter avec Haut/Bas), donc une
+            // estimation raisonnable suffit ici (elle n'affecte pas l'affichage).
+            var visibleGridColumns by remember { mutableStateOf(5) }
 
             LaunchedEffect(currentType) {
                 gridFocusRequester.requestFocus()
             }
 
             LazyVerticalGrid(
-                columns = GridCells.Fixed(gridColumns),
+                columns = GridCells.Adaptive(minSize = 150.dp),
                 state = gridState,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .onSizeChanged { size ->
+                        val estimatedColumns = (size.width / with(density) { 158.dp.toPx() }).toInt().coerceAtLeast(1)
+                        visibleGridColumns = estimatedColumns
+                    }
                     .focusRequester(gridFocusRequester)
                     .focusTarget()
                     .onPreviewKeyEvent { event ->
@@ -468,11 +490,11 @@ fun HomeScreen(
                                 true
                             }
                             Key.DirectionDown -> {
-                                scope.launch { gridState.animateScrollToItem((index + gridColumns).coerceAtMost(filtered.lastIndex)) }
+                                scope.launch { gridState.animateScrollToItem((index + visibleGridColumns).coerceAtMost(filtered.lastIndex)) }
                                 true
                             }
                             Key.DirectionUp -> {
-                                scope.launch { gridState.animateScrollToItem((index - gridColumns).coerceAtLeast(0)) }
+                                scope.launch { gridState.animateScrollToItem((index - visibleGridColumns).coerceAtLeast(0)) }
                                 true
                             }
                             else -> false
@@ -491,7 +513,23 @@ fun HomeScreen(
                         Box(
                             Modifier
                                 .fillMaxWidth()
-                                .aspectRatio(2f / 3f)
+                                // Hauteur FIXE (au lieu d'un aspectRatio qui
+                                // remplissait toute la largeur de colonne) :
+                                // dans une fenêtre large (ex: 1280px / 5
+                                // colonnes ≈ 240dp de large par colonne), un
+                                // aspectRatio(2f/3f) donnait des affiches
+                                // ~360dp de haut CHACUNE - la 1ère ligne à
+                                // elle seule remplissait presque tout l'écran
+                                // visible, donnant l'impression qu'"une seule
+                                // ligne de 5 colonnes" s'affichait (la 2e
+                                // ligne existait bien mais coupée en bas,
+                                // sans indice visuel de défilement). Avec une
+                                // hauteur fixe de 180dp, ContentScale.Crop
+                                // recadre proprement l'affiche pour remplir
+                                // cette boîte quelle que soit sa largeur - on
+                                // voit confortablement 2 lignes (10 affiches)
+                                // d'un coup dans une fenêtre standard.
+                                .height(180.dp)
                                 .clip(RoundedCornerShape(8.dp))
                         ) {
                             AsyncImage(
