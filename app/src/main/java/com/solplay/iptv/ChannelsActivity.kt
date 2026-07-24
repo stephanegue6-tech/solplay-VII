@@ -16,8 +16,9 @@ import kotlinx.coroutines.launch
 class ChannelsActivity : AppCompatActivity() {
 
     companion object {
-        const val EXTRA_CHANNELS = "extra_channels"
-        const val EXTRA_INITIAL_TYPE = "extra_initial_type"
+        const val EXTRA_CHANNELS      = "extra_channels"
+        const val EXTRA_INITIAL_TYPE  = "extra_initial_type"
+        const val EXTRA_FAVORITES_MODE = "extra_favorites_mode"
         private const val ALL_BOUQUETS = "Tous"
     }
 
@@ -49,9 +50,11 @@ class ChannelsActivity : AppCompatActivity() {
         binding.recyclerChannels.adapter = channelAdapter
 
         bouquetAdapter = BouquetAdapter(emptyList()) { bouquet ->
-            currentBouquet = bouquet.name
-            bouquetAdapter.setSelected(bouquet.name)
-            applyFilters()
+            requireParentalPinIfNeeded(bouquet.name) {
+                currentBouquet = bouquet.name
+                bouquetAdapter.setSelected(bouquet.name)
+                applyFilters()
+            }
         }
         binding.recyclerBouquets.layoutManager = LinearLayoutManager(this)
         binding.recyclerBouquets.adapter = bouquetAdapter
@@ -69,6 +72,12 @@ class ChannelsActivity : AppCompatActivity() {
 
         refreshBouquets()
         applyFilters()
+
+        // Mode favoris : bannière en haut pour indiquer le contexte
+        if (intent.getBooleanExtra(EXTRA_FAVORITES_MODE, false)) {
+            android.widget.Toast.makeText(this,
+                "⭐ Affichage de vos favoris", android.widget.Toast.LENGTH_SHORT).show()
+        }
 
         checkSubscriptionExpiration(activePlaylist)
     }
@@ -214,6 +223,11 @@ class ChannelsActivity : AppCompatActivity() {
     }
 
     private fun openPlayer(channel: Channel) {
+        if (ParentalControl.isAdultChannel(channel) && !ParentalControl.isUnlocked()) {
+            showParentalPinDialog { openPlayer(channel) }
+            return
+        }
+
         // Une "coquille" de série (chargement direct JSON, voir XtreamApiClient) ne
         // contient pas encore d'épisodes lisibles : on les récupère à la demande, au
         // moment où l'utilisateur ouvre cette série précise (plutôt que de charger
@@ -227,6 +241,49 @@ class ChannelsActivity : AppCompatActivity() {
         intent.putExtra(PlayerActivity.EXTRA_STREAM_URL, channel.streamUrl)
         intent.putExtra(PlayerActivity.EXTRA_STREAM_NAME, channel.name)
         startActivity(intent)
+    }
+
+    /**
+     * Si [label] (nom de bouquet/catégorie) correspond à du contenu adulte et
+     * que la session n'est pas encore déverrouillée, demande le code parental
+     * avant d'exécuter [onGranted]. Sinon exécute [onGranted] immédiatement.
+     */
+    private fun requireParentalPinIfNeeded(label: String, onGranted: () -> Unit) {
+        if (!ParentalControl.isAdultLabel(label) || ParentalControl.isUnlocked()) {
+            onGranted()
+            return
+        }
+        showParentalPinDialog(onGranted)
+    }
+
+    /** Affiche une boîte de dialogue à code PIN (4 chiffres) protégeant le contenu adulte. */
+    private fun showParentalPinDialog(onGranted: () -> Unit) {
+        val input = android.widget.EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            hint = "Code parental (4 chiffres)"
+            filters = arrayOf(android.text.InputFilter.LengthFilter(4))
+        }
+        val container = android.widget.FrameLayout(this).apply {
+            val padding = (16 * resources.displayMetrics.density).toInt()
+            setPadding(padding, padding, padding, 0)
+            addView(input)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("🔒 Contenu réservé aux adultes")
+            .setMessage("Cette catégorie est protégée. Entrez le code parental pour continuer.")
+            .setView(container)
+            .setPositiveButton("Valider") { _, _ ->
+                if (ParentalControl.verifyPin(this, input.text.toString().trim())) {
+                    ParentalControl.unlock()
+                    onGranted()
+                } else {
+                    android.widget.Toast.makeText(this, "Code incorrect.", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Annuler", null)
+            .setCancelable(true)
+            .show()
     }
 
     private fun openSeriesEpisodes(seriesChannel: Channel) {

@@ -11,9 +11,11 @@ import java.util.concurrent.ConcurrentHashMap
 
 /** Résultat TMDB minimal utile à l'affichage dans la liste des chaînes. */
 data class TmdbInfo(
-    val posterUrl: String?,
-    val overview: String?,
-    val year: String?
+    val posterUrl   : String?,
+    val overview    : String?,
+    val year        : String?,
+    val voteAverage : Double? = null,
+    val genres      : List<String>? = null
 )
 
 /**
@@ -39,9 +41,22 @@ data class TmdbSearchResult(
  */
 object TmdbClient {
 
-    private const val API_KEY = BuildConfig.TMDB_API_KEY
-    private const val BASE_URL = "https://api.themoviedb.org/3"
+    private const val API_KEY       = BuildConfig.TMDB_API_KEY
+    private const val BASE_URL      = "https://api.themoviedb.org/3"
     private const val IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w342"
+
+    /** IDs de genres TMDB → libellés français (les plus courants). */
+    private val GENRE_MAP = mapOf(
+        28 to "Action", 12 to "Aventure", 16 to "Animation", 35 to "Comédie",
+        80 to "Crime", 99 to "Documentaire", 18 to "Drame", 10751 to "Famille",
+        14 to "Fantastique", 36 to "Histoire", 27 to "Horreur", 10402 to "Musique",
+        9648 to "Mystère", 10749 to "Romance", 878 to "Sci-Fi", 10770 to "Téléfilm",
+        53 to "Thriller", 10752 to "Guerre", 37 to "Western",
+        // Séries TV
+        10759 to "Action", 10762 to "Enfants", 10763 to "Actualités",
+        10764 to "Réalité", 10765 to "Sci-Fi", 10766 to "Soap", 10767 to "Talk-show",
+        10768 to "Guerre"
+    )
 
     private val client = OkHttpClient.Builder().build()
 
@@ -98,9 +113,15 @@ object TmdbClient {
                     val date = first.optString(dateField, "")
 
                     val info = TmdbInfo(
-                        posterUrl = if (posterPath.isNotBlank()) "$IMAGE_BASE_URL$posterPath" else null,
-                        overview = first.optString("overview", "").ifBlank { null },
-                        year = date.take(4).ifBlank { null }
+                        posterUrl   = if (posterPath.isNotBlank()) "$IMAGE_BASE_URL$posterPath" else null,
+                        overview    = first.optString("overview", "").ifBlank { null },
+                        year        = date.take(4).ifBlank { null },
+                        voteAverage = first.optDouble("vote_average", 0.0).takeIf { it > 0 },
+                        genres      = first.optJSONArray("genre_ids")?.let { arr ->
+                            (0 until minOf(arr.length(), 2)).mapNotNull { i ->
+                                GENRE_MAP[arr.optInt(i)]
+                            }
+                        }
                     )
                     val msg = if (info.posterUrl != null) "TMDB: OK (${info.year ?: "?"})" else "TMDB: trouvé mais sans affiche"
                     val result = TmdbSearchResult(info, msg)

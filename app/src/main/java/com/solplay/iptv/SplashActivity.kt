@@ -1,12 +1,17 @@
 package com.solplay.iptv
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -21,6 +26,11 @@ class SplashActivity : AppCompatActivity() {
         setContentView(R.layout.activity_splash)
 
         TrialManager.ensureFirstLaunchRecorded(this)
+        requestNotificationPermissionIfNeeded()
+        // Best effort, ne bloque jamais le démarrage : permet au panel admin
+        // de cibler CET appareil précis pour une notification (voir
+        // FcmTokenSync / SolPlayFirebaseMessagingService).
+        FcmTokenSync.syncTokenIfNeeded(this)
 
         // Lancée en parallèle du délai d'affichage du splash : ne retarde
         // jamais le démarrage de l'app si le réseau est lent ou absent.
@@ -29,6 +39,25 @@ class SplashActivity : AppCompatActivity() {
         Handler(Looper.getMainLooper()).postDelayed({
             goToNextScreen()
         }, 1500)
+    }
+
+    /**
+     * Depuis Android 13 (API 33), afficher une notification nécessite une
+     * permission explicitement accordée par l'utilisateur (comme pour la
+     * caméra ou la localisation) - sans quoi ni le rappel horaire de temps
+     * restant, ni les messages envoyés par l'admin ne s'afficheraient jamais,
+     * silencieusement. Demandée une seule fois, dès le premier lancement.
+     */
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            ActivityCompat.requestPermissions(
+                this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100
+            )
+        }
     }
 
     private fun checkForUpdate() {
