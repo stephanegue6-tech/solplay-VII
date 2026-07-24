@@ -205,109 +205,116 @@
 
         </LinearLayout>
 
-        <!-- Action secondaire en pilule verte, sous les 3 tuiles -->
+        <!-- Rangée compacte de 3 pilules, façon modèle TV Smarters :
+             Changer de serveur / Favoris / Historique côte à côte,
+             au lieu de 3 barres pleine largeur empilées. -->
         <LinearLayout
-            android:id="@+id/tileChangeServer"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginTop="6dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:background="@drawable/bg_pill_green"
-            android:clickable="true"
-            android:focusable="true">
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="horizontal">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🔄"
-                android:textSize="18sp"
-                android:layout_marginEnd="8dp" />
+            <LinearLayout
+                android:id="@+id/tileChangeServer"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="4dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:background="@drawable/bg_pill_green"
+                android:clickable="true"
+                android:focusable="true">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="CHANGER DE SERVEUR"
-                android:textColor="@color/solplay_white"
-                android:textStyle="bold"
-                android:textSize="14sp"
-                android:letterSpacing="0.03" />
-        </LinearLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🔄"
+                    android:textSize="14sp"
+                    android:layout_marginEnd="5dp" />
 
-        <!-- Tuile Favoris -->
-        <LinearLayout
-            android:id="@+id/tileFavorites"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginTop="6dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:background="@drawable/bg_pill_green"
-            android:clickable="true"
-            android:focusable="true">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="SERVEUR"
+                    android:textColor="@color/solplay_white"
+                    android:textStyle="bold"
+                    android:textSize="11sp"
+                    android:maxLines="1"
+                    android:letterSpacing="0.02" />
+            </LinearLayout>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="⭐"
-                android:textSize="18sp"
-                android:layout_marginEnd="8dp" />
+            <LinearLayout
+                android:id="@+id/tileFavorites"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:background="@drawable/bg_pill_green"
+                android:clickable="true"
+                android:focusable="true">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="MES FAVORIS"
-                android:textColor="@color/solplay_white"
-                android:textStyle="bold"
-                android:textSize="14sp"
-                android:letterSpacing="0.03" />
-        </LinearLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⭐"
+                    android:textSize="14sp"
+                    android:layout_marginEnd="5dp" />
 
-        <!-- Tuile Historique -->
-        <LinearLayout
-            android:id="@+id/tileHistory"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginTop="6dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:background="@drawable/bg_pill_green"
-            android:clickable="true"
-            android:focusable="true">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="FAVORIS"
+                    android:textColor="@color/solplay_white"
+                    android:textStyle="bold"
+                    android:textSize="11sp"
+                    android:maxLines="1"
+                    android:letterSpacing="0.02" />
+            </LinearLayout>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🕐"
-                android:textSize="18sp"
-                android:layout_marginEnd="8dp" />
+            <LinearLayout
+                android:id="@+id/tileHistory"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="8dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:background="@drawable/bg_pill_green"
+                android:clickable="true"
+                android:focusable="true">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="HISTORIQUE"
-                android:textColor="@color/solplay_white"
-                android:textStyle="bold"
-                android:textSize="14sp"
-                android:letterSpacing="0.03" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🕐"
+                    android:textSize="14sp"
+                    android:layout_marginEnd="5dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="HISTORIQUE"
+                    android:textColor="@color/solplay_white"
+                    android:textStyle="bold"
+                    android:textSize="11sp"
+                    android:maxLines="1"
+                    android:letterSpacing="0.02" />
+            </LinearLayout>
+
         </LinearLayout>
 
         <!-- Tuile Reprendre (visible uniquement si une lecture récente existe) -->
         <LinearLayout
             android:id="@+id/tileResume"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginTop="6dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="8dp"
             android:layout_marginStart="8dp"
             android:layout_marginEnd="8dp"
             android:orientation="horizontal"
