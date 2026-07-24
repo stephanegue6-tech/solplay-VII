@@ -77,6 +77,24 @@
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
         android:text="Copier la clé appareil" />
 
+    <Button
+        android:id="@+id/btnShowQrDeviceKey"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="#FF7A00"
+        android:textColor="#FFFFFF"
+        android:text="📷 Afficher le QR Code (pour votre admin)" />
+
+    <Button
+        android:id="@+id/btnRequestRenewal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="#2E9E4F"
+        android:textColor="#FFFFFF"
+        android:text="🔄 Demander un renouvellement" />
+
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"

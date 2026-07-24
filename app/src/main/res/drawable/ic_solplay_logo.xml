@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Logo original SolPlay : un cercle "soleil" dans l'orange de marque
+    (@color/solplay_orange) avec un triangle "lecture" blanc au centre -
+    référence au nom (Sol = soleil, Play = lecture). Dessiné entièrement en
+    vectoriel pour rester net à toutes les tailles (barre du haut, icône de
+    lanceur, etc.), sans reprendre aucun élément visuel d'un logo tiers.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Disque "soleil" -->
+    <path
+        android:fillColor="#FF7A00"
+        android:pathData="M12,1 A11,11 0 1,1 11.99,1 Z" />
+
+    <!-- Léger halo intérieur, un ton plus foncé, pour donner du relief au disque -->
+    <path
+        android:fillColor="#E56A00"
+        android:fillAlpha="0.35"
+        android:pathData="M12,3 A9,9 0 1,1 11.99,3 Z" />
+
+    <!-- Triangle de lecture, centré -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M9,7.2 L17,12 L9,16.8 Z" />
+
+</vector>

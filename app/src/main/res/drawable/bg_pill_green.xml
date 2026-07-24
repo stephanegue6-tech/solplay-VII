@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Bouton "pilule" arrondi en vert de marque SolPlay (solplay_green), pour
+    les actions secondaires de l'accueil (ex: Changer de serveur) - même
+    esprit que les pilules vertes "UPDATE EPG / ACCOUNT / CATCH UP" du
+    modèle fourni, mais avec les couleurs déjà utilisées par l'app.
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/solplay_green_dark" />
+            <corners android:radius="28dp" />
+            <stroke android:width="3dp" android:color="@color/solplay_white" />
+        </shape>
+    </item>
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/solplay_green_dark" />
+            <corners android:radius="28dp" />
+        </shape>
+    </item>
+    <item android:state_selected="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/solplay_green_dark" />
+            <corners android:radius="28dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/solplay_green" />
+            <corners android:radius="28dp" />
+        </shape>
+    </item>
+</selector>

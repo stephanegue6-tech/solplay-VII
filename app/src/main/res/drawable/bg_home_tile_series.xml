@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Fond dégradé de la tuile "Séries" (violet-bleu), même logique d'états
+    que les autres tuiles de l'accueil.
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="#7B2FF7"
+                android:endColor="#2B2FA0" />
+            <corners android:radius="18dp" />
+            <stroke android:width="3dp" android:color="@color/solplay_white" />
+        </shape>
+    </item>
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="#621FCC"
+                android:endColor="#1F2280" />
+            <corners android:radius="18dp" />
+        </shape>
+    </item>
+    <item android:state_selected="true">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="#621FCC"
+                android:endColor="#1F2280" />
+            <corners android:radius="18dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="#7B2FF7"
+                android:endColor="#4B2FBF" />
+            <corners android:radius="18dp" />
+        </shape>
+    </item>
+</selector>

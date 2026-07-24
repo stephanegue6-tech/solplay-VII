@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Fond dégradé de la tuile "Films" : garde intact l'orange de marque SolPlay
+    (solplay_orange / solplay_orange_dark), simplement présenté en dégradé
+    façon grille TV Smarters plutôt qu'en aplat uni.
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="@color/solplay_orange"
+                android:endColor="#A34400" />
+            <corners android:radius="18dp" />
+            <stroke android:width="3dp" android:color="@color/solplay_white" />
+        </shape>
+    </item>
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="@color/solplay_orange_dark"
+                android:endColor="#8A3A00" />
+            <corners android:radius="18dp" />
+        </shape>
+    </item>
+    <item android:state_selected="true">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="@color/solplay_orange_dark"
+                android:endColor="#8A3A00" />
+            <corners android:radius="18dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="@color/solplay_orange"
+                android:endColor="@color/solplay_orange_dark" />
+            <corners android:radius="18dp" />
+        </shape>
+    </item>
+</selector>
